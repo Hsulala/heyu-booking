@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f4ef" />
+    <title>HEYU 店家後台</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">HEYU 店家後台</p>
+          <p class="store-name">禾域</p>
+        </div>
+        <button class="avatar" type="button" aria-label="開啟帳號選單">闆</button>
+      </header>
+
+      <main id="main-content">
+        <section class="screen is-active" data-screen="home" aria-labelledby="home-title">
+          <div class="greeting">
+            <p>9 月 27 日・星期日</p>
+            <h1 id="home-title">早安，店長</h1>
+            <span>今天有 4 組客人，從容安排就好。</span>
+          </div>
+
+          <article class="next-booking card accent-card">
+            <div class="section-heading compact">
+              <div>
+                <p class="eyebrow">下一組客人</p>
+                <h2>10:00・陳小姐</h2>
+              </div>
+              <span class="status status-ready">已確認</span>
+            </div>
+            <p>單人・身體精油按摩 60 分・小君</p>
+            <button class="text-button" type="button" data-open-detail>查看預約詳情 <span>→</span></button>
+          </article>
+
+          <section aria-labelledby="todo-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">需要你處理</p>
+                <h2 id="todo-title">今日待辦</h2>
+              </div>
+              <span class="count-badge">3</span>
+            </div>
+            <div class="task-list">
+              <button class="task-card" type="button" data-go="bookings">
+                <span class="task-icon urgent">!</span>
+                <span><strong>1 組尚未指派老師</strong><small>今天 15:30・雙人預約</small></span>
+                <span class="chevron">›</span>
+              </button>
+              <button class="task-card" type="button" data-toast="已開啟待結帳清單">
+                <span class="task-icon">$</span>
+                <span><strong>1 筆服務待結帳</strong><small>確認付款、點數與優惠</small></span>
+                <span class="chevron">›</span>
+              </button>
+              <button class="task-card" type="button" data-toast="已開啟未報到名單">
+                <span class="task-icon">⌁</span>
+                <span><strong>1 位客人尚未報到</strong><small>已超過預約時間 8 分鐘</small></span>
+                <span class="chevron">›</span>
+              </button>
+            </div>
+          </section>
+
+          <section aria-labelledby="summary-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">快速掌握</p>
+                <h2 id="summary-title">今日概況</h2>
+              </div>
+            </div>
+            <div class="summary-grid">
+              <article class="metric card"><span>今日預約</span><strong>4</strong><small>5 位客人</small></article>
+              <article class="metric card"><span>已完成</span><strong>1</strong><small>尚有 3 組</small></article>
+              <article class="metric card wide"><span>今日已收款</span><strong>NT$ 2,400</strong><small>不含待結帳款項</small></article>
+            </div>
+          </section>
+        </section>
+
+        <section class="screen" data-screen="bookings" aria-labelledby="bookings-title">
+          <div class="page-title">
+            <div><p class="eyebrow">行程管理</p><h1 id="bookings-title">預約</h1></div>
+            <button class="primary-small" type="button" data-open-create>＋ 新增</button>
+          </div>
+          <div class="date-strip" role="tablist" aria-label="預約日期">
+            <button type="button"><span>六</span><strong>26</strong></button>
+            <button class="is-selected" type="button"><span>今天</span><strong>27</strong></button>
+            <button type="button"><span>一</span><strong>28</strong></button>
+            <button type="button"><span>二</span><strong>29</strong></button>
+            <button type="button"><span>三</span><strong>30</strong></button>
+          </div>
+          <div class="filter-row">
+            <button class="chip is-selected" type="button">全部</button>
+            <button class="chip" type="button">待處理 1</button>
+            <button class="chip" type="button">已完成</button>
+          </div>
+          <div class="timeline">
+            <article class="booking-row completed">
+              <time>09:00</time><span class="line-dot"></span>
+              <button class="booking-card" type="button" data-open-detail>
+                <span class="booking-top"><strong>林小姐</strong><span class="status">已完成</span></span>
+                <small>單人・深層舒壓 90 分</small><span class="therapist">老師：Amy</span>
+              </button>
+            </article>
+            <article class="booking-row">
+              <time>10:00</time><span class="line-dot"></span>
+              <button class="booking-card" type="button" data-open-detail>
+                <span class="booking-top"><strong>陳小姐</strong><span class="status status-ready">已確認</span></span>
+                <small>單人・身體精油按摩 60 分</small><span class="therapist">老師：小君・緩衝至 11:30</span>
+              </button>
+            </article>
+            <div class="open-slot"><time>12:00</time><span>可預約時段</span></div>
+            <article class="booking-row attention">
+              <time>15:30</time><span class="line-dot"></span>
+              <button class="booking-card" type="button" data-open-detail>
+                <span class="booking-top"><strong>張小姐一行</strong><span class="status status-alert">待指派</span></span>
+                <small>雙人・筋膜刀 60 分＋精油按摩 60 分</small><span class="therapist">尚有 1 位老師未指派</span>
+              </button>
+            </article>
+          </div>
+        </section>
+
+        <section class="screen" data-screen="members" aria-labelledby="members-title">
+          <div class="page-title"><div><p class="eyebrow">顧客關係</p><h1 id="members-title">會員</h1></div></div>
+          <label class="search-box"><span aria-hidden="true">⌕</span><input id="member-search" type="search" placeholder="搜尋姓名或手機末三碼" /></label>
+          <div class="member-list" id="member-list">
+            <button class="member-card card" type="button" data-name="陳怡安 678">
+              <span class="member-avatar">陳</span><span><strong>陳怡安</strong><small>最近到店：9/18</small><em>點數 320・精油按摩 3 堂</em></span><span class="chevron">›</span>
+            </button>
+            <button class="member-card card" type="button" data-name="林郁晴 216">
+              <span class="member-avatar">林</span><span><strong>林郁晴</strong><small>最近到店：9/12</small><em>點數 80・無堂數包</em></span><span class="chevron">›</span>
+            </button>
+            <button class="member-card card" type="button" data-name="張芷寧 509">
+              <span class="member-avatar">張</span><span><strong>張芷寧</strong><small>首次預約：今天</small><em>新會員・待填問卷</em></span><span class="chevron">›</span>
+            </button>
+          </div>
+          <p class="empty-state" id="member-empty" hidden>找不到符合的會員</p>
+        </section>
+
+        <section class="screen" data-screen="more" aria-labelledby="more-title">
+          <div class="page-title"><div><p class="eyebrow">營運設定</p><h1 id="more-title">更多</h1></div></div>
+          <div class="settings-list card">
+            <button type="button"><span>療程與緩衝時間</span><span>›</span></button>
+            <button type="button"><span>老師與可服務項目</span><span>›</span></button>
+            <button type="button"><span>營業時間與休假</span><span>›</span></button>
+            <button type="button"><span>點數、優惠券與堂數包</span><span>›</span></button>
+            <button type="button"><span>提醒與爽約規則</span><span>›</span></button>
+            <button type="button"><span>分店管理</span><span>›</span></button>
+          </div>
+          <p class="prototype-note">這是操作原型，設定項目會在下一階段接上實際資料。</p>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="主要功能">
+        <button class="is-active" type="button" data-nav="home"><span>⌂</span>首頁</button>
+        <button type="button" data-nav="bookings"><span>▣</span>預約</button>
+        <button class="create-button" type="button" data-open-create aria-label="新增預約"><span>＋</span>新增</button>
+        <button type="button" data-nav="members"><span>♙</span>會員</button>
+        <button type="button" data-nav="more"><span>•••</span>更多</button>
+      </nav>
+    </div>
+
+    <div class="backdrop" hidden></div>
+    <section class="bottom-sheet" id="create-sheet" role="dialog" aria-modal="true" aria-labelledby="create-title" hidden>
+      <div class="sheet-handle"></div>
+      <div class="sheet-header"><div><p class="eyebrow">快速操作</p><h2 id="create-title">新增</h2></div><button type="button" data-close-sheet aria-label="關閉">×</button></div>
+      <button class="sheet-action primary-action" type="button"><span>＋</span><span><strong>新增預約</strong><small>建立單人或雙人預約</small></span></button>
+      <button class="sheet-action" type="button"><span>♙</span><span><strong>新增會員</strong><small>先建立會員基本資料</small></span></button>
+      <button class="sheet-action" type="button"><span>休</span><span><strong>新增休假</strong><small>封鎖老師或全店時段</small></span></button>
+    </section>
+
+    <section class="bottom-sheet" id="detail-sheet" role="dialog" aria-modal="true" aria-labelledby="detail-title" hidden>
+      <div class="sheet-handle"></div>
+      <div class="sheet-header"><div><p class="eyebrow">預約詳情</p><h2 id="detail-title">陳小姐・10:00</h2></div><button type="button" data-close-sheet aria-label="關閉">×</button></div>
+      <dl class="detail-list"><div><dt>人數</dt><dd>單人</dd></div><div><dt>療程</dt><dd>身體精油按摩 60 分</dd></div><div><dt>老師</dt><dd>小君</dd></div><div><dt>使用資源</dt><dd>第 1 床・緩衝至 11:30</dd></div></dl>
+      <div class="detail-actions"><button type="button">聯絡客人</button><button class="primary-small" type="button">辦理報到</button></div>
+    </section>
+    <div class="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js" defer></script>
+  </body>
+</html>
