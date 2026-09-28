@@ -1,23 +1,23 @@
 :root {
   color-scheme: light;
-  --bg: #f7f4ef;
-  --surface: #fffdf9;
-  --surface-soft: #efede6;
-  --ink: #26332d;
-  --muted: #707870;
-  --line: #e3e0d8;
-  --brand: #536c60;
-  --brand-dark: #32483e;
-  --brand-soft: #dce7df;
-  --sand: #e8d6b7;
-  --alert: #a34b3f;
-  --alert-soft: #f5e2dd;
-  --shadow: 0 10px 28px rgba(47, 59, 52, 0.08);
+  --bg: #f8efe4;
+  --surface: #fffaf4;
+  --surface-soft: #f0e3d4;
+  --ink: #4a3427;
+  --muted: #887160;
+  --line: #e5d3bf;
+  --brand: #9a6a3e;
+  --brand-dark: #684328;
+  --brand-soft: #ead7c0;
+  --sand: #d5ad7b;
+  --alert: #a34f3f;
+  --alert-soft: #f3ddd3;
+  --shadow: 0 10px 28px rgba(104, 67, 40, 0.1);
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang TC", sans-serif;
 }
 
 * { box-sizing: border-box; }
-html { background: #d9ddd8; }
+html { background: #e4d7c9; }
 body { margin: 0; color: var(--ink); background: var(--bg); }
 button, input { font: inherit; }
 button { color: inherit; }
@@ -47,7 +47,7 @@ h2 { margin-bottom: 0; font-size: 21px; letter-spacing: -.02em; }
 .section-heading.compact { margin: 0; align-items: flex-start; }
 .count-badge { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: white; background: var(--brand); font-weight: 800; }
 .status { padding: 5px 9px; border-radius: 999px; color: var(--muted); background: var(--surface-soft); font-size: 11px; font-weight: 800; white-space: nowrap; }
-.status-ready { color: #345745; background: #e1ece5; }
+.status-ready { color: #674529; background: #f1dfca; }
 .status-alert { color: var(--alert); background: var(--alert-soft); }
 .task-list { display: grid; gap: 10px; }
 .task-card { display: grid; grid-template-columns: 42px 1fr 16px; gap: 12px; align-items: center; width: 100%; padding: 15px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); text-align: left; }
@@ -72,7 +72,7 @@ h2 { margin-bottom: 0; font-size: 21px; letter-spacing: -.02em; }
 .date-strip button { display: grid; gap: 6px; justify-items: center; padding: 10px 2px; color: var(--muted); border: 0; border-radius: 16px; background: transparent; }
 .date-strip span { font-size: 11px; }
 .date-strip strong { font-size: 17px; }
-.date-strip .is-selected { color: white; background: var(--brand); box-shadow: 0 7px 18px rgba(83,108,96,.2); }
+.date-strip .is-selected { color: white; background: var(--brand); box-shadow: 0 7px 18px rgba(104,67,40,.2); }
 .filter-row { display: flex; gap: 8px; overflow: auto; margin-bottom: 24px; scrollbar-width: none; }
 .chip { padding: 9px 14px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; background: transparent; white-space: nowrap; font-size: 13px; }
 .chip.is-selected { color: var(--brand-dark); border-color: var(--brand-soft); background: var(--brand-soft); font-weight: 800; }
@@ -83,7 +83,7 @@ h2 { margin-bottom: 0; font-size: 21px; letter-spacing: -.02em; }
 .line-dot { z-index: 2; width: 10px; height: 10px; margin-top: 21px; border: 2px solid var(--bg); border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
 .attention .line-dot { background: var(--alert); box-shadow: 0 0 0 2px var(--alert-soft); }
 .completed .line-dot { background: #9fa59f; }
-.booking-card { display: block; width: 100%; padding: 17px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); text-align: left; box-shadow: 0 5px 18px rgba(47,59,52,.05); }
+.booking-card { display: block; width: 100%; padding: 17px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); text-align: left; box-shadow: 0 5px 18px rgba(104,67,40,.06); }
 .booking-top { display: flex; justify-content: space-between; align-items: center; }
 .booking-card small, .booking-card .therapist { display: block; }
 .booking-card small { margin: 8px 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
@@ -111,10 +111,10 @@ h2 { margin-bottom: 0; font-size: 21px; letter-spacing: -.02em; }
 .bottom-nav button > span { font-size: 20px; line-height: 1; }
 .bottom-nav .is-active { color: var(--brand-dark); font-weight: 800; }
 .bottom-nav .create-button { position: relative; top: -18px; color: var(--brand-dark); font-weight: 800; }
-.bottom-nav .create-button > span { display: grid; place-items: center; width: 54px; height: 54px; color: white; border: 5px solid var(--bg); border-radius: 50%; background: var(--brand); box-shadow: 0 8px 22px rgba(50,72,62,.22); font-size: 28px; font-weight: 400; }
+.bottom-nav .create-button > span { display: grid; place-items: center; width: 54px; height: 54px; color: white; border: 5px solid var(--bg); border-radius: 50%; background: var(--brand); box-shadow: 0 8px 22px rgba(104,67,40,.24); font-size: 28px; font-weight: 400; }
 
-.backdrop { position: fixed; z-index: 40; inset: 0; background: rgba(27,36,32,.42); backdrop-filter: blur(2px); }
-.bottom-sheet { position: fixed; z-index: 50; right: 0; bottom: 0; left: 0; padding: 10px 20px calc(22px + env(safe-area-inset-bottom)); border-radius: 28px 28px 0 0; background: var(--surface); box-shadow: 0 -16px 50px rgba(38,51,45,.16); animation: sheet-up .25s ease; }
+.backdrop { position: fixed; z-index: 40; inset: 0; background: rgba(62,40,26,.42); backdrop-filter: blur(2px); }
+.bottom-sheet { position: fixed; z-index: 50; right: 0; bottom: 0; left: 0; padding: 10px 20px calc(22px + env(safe-area-inset-bottom)); border-radius: 28px 28px 0 0; background: var(--surface); box-shadow: 0 -16px 50px rgba(78,50,30,.17); animation: sheet-up .25s ease; }
 @keyframes sheet-up { from { transform: translateY(100%); } }
 .sheet-handle { width: 42px; height: 5px; margin: 0 auto 18px; border-radius: 99px; background: #d7d5cf; }
 .sheet-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
@@ -141,7 +141,7 @@ h2 { margin-bottom: 0; font-size: 21px; letter-spacing: -.02em; }
    Tablet-sized and in-app previews should keep the navigation flush to the viewport. */
 @media (min-width: 1100px) {
   body { padding: 24px 0; }
-  .app-shell { max-width: 430px; min-height: calc(100dvh - 48px); margin: auto; overflow: hidden; border-radius: 30px; box-shadow: 0 28px 80px rgba(38,51,45,.18); }
+  .app-shell { max-width: 430px; min-height: calc(100dvh - 48px); margin: auto; overflow: hidden; border-radius: 30px; box-shadow: 0 28px 80px rgba(78,50,30,.19); }
   .topbar { top: 24px; max-width: 430px; margin: auto; }
   .bottom-nav { right: calc((100vw - 430px) / 2); bottom: 24px; left: calc((100vw - 430px) / 2); border-radius: 0 0 30px 30px; }
   .bottom-sheet { right: calc((100vw - 430px) / 2); bottom: 24px; left: calc((100vw - 430px) / 2); border-radius: 28px; }

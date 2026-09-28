@@ -45,3 +45,12 @@ test('in-app and tablet previews keep the mobile navigation flush to the bottom'
   assert.match(css, /@media \(min-width: 1100px\)/);
   assert.doesNotMatch(css, /@media \(min-width: 720px\)/);
 });
+
+test('brand palette uses milk-tea and coffee colors', async () => {
+  const [html, css] = await Promise.all([readFile(files.html, 'utf8'), readFile(files.css, 'utf8')]);
+  assert.match(html, /theme-color" content="#f8efe4"/);
+  assert.match(css, /--bg: #f8efe4/);
+  assert.match(css, /--ink: #4a3427/);
+  assert.match(css, /--brand: #9a6a3e/);
+  assert.doesNotMatch(css, /--brand: #536c60/);
+});
