@@ -11,7 +11,7 @@
     <div class="app-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">HEYU 店家後台</p>
+          <p class="eyebrow">HEYU 店家後台 <span class="demo-badge">測試版</span></p>
           <p class="store-name">禾域</p>
         </div>
         <button class="avatar" type="button" aria-label="開啟帳號選單">闆</button>
@@ -20,7 +20,7 @@
       <main id="main-content">
         <section class="screen is-active" data-screen="home" aria-labelledby="home-title">
           <div class="greeting">
-            <p>9 月 27 日・星期日</p>
+            <p id="today-label">今日</p>
             <h1 id="home-title">早安，店長</h1>
             <span>今天有 4 組客人，從容安排就好。</span>
           </div>
@@ -96,7 +96,7 @@
             <button class="chip" type="button">待處理 1</button>
             <button class="chip" type="button">已完成</button>
           </div>
-          <div class="timeline">
+          <div class="timeline" id="booking-timeline">
             <article class="booking-row completed">
               <time>09:00</time><span class="line-dot"></span>
               <button class="booking-card" type="button" data-open-detail>
@@ -148,6 +148,7 @@
             <button type="button"><span>點數、優惠券與堂數包</span><span>›</span></button>
             <button type="button"><span>提醒與爽約規則</span><span>›</span></button>
             <button type="button"><span>分店管理</span><span>›</span></button>
+            <button type="button" data-reset-demo><span>重設本機測試資料</span><span>↺</span></button>
           </div>
           <p class="prototype-note">這是操作原型，設定項目會在下一階段接上實際資料。</p>
         </section>
@@ -166,9 +167,39 @@
     <section class="bottom-sheet" id="create-sheet" role="dialog" aria-modal="true" aria-labelledby="create-title" hidden>
       <div class="sheet-handle"></div>
       <div class="sheet-header"><div><p class="eyebrow">快速操作</p><h2 id="create-title">新增</h2></div><button type="button" data-close-sheet aria-label="關閉">×</button></div>
-      <button class="sheet-action primary-action" type="button"><span>＋</span><span><strong>新增預約</strong><small>建立單人或雙人預約</small></span></button>
-      <button class="sheet-action" type="button"><span>♙</span><span><strong>新增會員</strong><small>先建立會員基本資料</small></span></button>
+      <button class="sheet-action primary-action" type="button" data-open-booking-form><span>＋</span><span><strong>新增預約</strong><small>建立單人或雙人預約</small></span></button>
+      <button class="sheet-action" type="button" data-open-member-form><span>♙</span><span><strong>新增會員</strong><small>先建立會員基本資料</small></span></button>
       <button class="sheet-action" type="button"><span>休</span><span><strong>新增休假</strong><small>封鎖老師或全店時段</small></span></button>
+    </section>
+
+    <section class="bottom-sheet form-sheet" id="booking-form-sheet" role="dialog" aria-modal="true" aria-labelledby="booking-form-title" hidden>
+      <div class="sheet-handle"></div>
+      <div class="sheet-header"><div><p class="eyebrow">測試操作</p><h2 id="booking-form-title">新增預約</h2></div><button type="button" data-close-sheet aria-label="關閉">×</button></div>
+      <form id="booking-form">
+        <div class="form-grid">
+          <label class="field full"><span>客人姓名</span><input name="customer" required maxlength="30" placeholder="例如：王小姐" /></label>
+          <label class="field"><span>日期</span><input name="date" type="date" required /></label>
+          <label class="field"><span>時間</span><input name="time" type="time" required /></label>
+          <label class="field"><span>人數</span><select name="partySize"><option value="1">單人</option><option value="2">雙人</option></select></label>
+          <label class="field"><span>療程</span><select name="service"><option>身體精油按摩 60 分</option><option>深層舒壓 90 分</option><option>筋膜刀 60 分</option></select></label>
+          <label class="field full"><span>按摩師</span><select name="therapist"><option value="">稍後指派</option><option>小君</option><option>Amy</option><option>Kelly</option></select></label>
+        </div>
+        <p class="form-help">測試版資料只會保存在這台裝置的瀏覽器，不會寫入正式會員資料庫。</p>
+        <button class="submit-button" type="submit">建立測試預約</button>
+      </form>
+    </section>
+
+    <section class="bottom-sheet form-sheet" id="member-form-sheet" role="dialog" aria-modal="true" aria-labelledby="member-form-title" hidden>
+      <div class="sheet-handle"></div>
+      <div class="sheet-header"><div><p class="eyebrow">測試操作</p><h2 id="member-form-title">新增會員</h2></div><button type="button" data-close-sheet aria-label="關閉">×</button></div>
+      <form id="member-form">
+        <div class="form-grid">
+          <label class="field full"><span>姓名</span><input name="name" required maxlength="30" placeholder="例如：王小美" /></label>
+          <label class="field full"><span>手機</span><input name="phone" inputmode="tel" maxlength="20" placeholder="09xx xxx xxx" /></label>
+        </div>
+        <p class="form-help">LINE 綁定與健康問卷會在正式會員流程中完成。</p>
+        <button class="submit-button" type="submit">建立測試會員</button>
+      </form>
     </section>
 
     <section class="bottom-sheet" id="detail-sheet" role="dialog" aria-modal="true" aria-labelledby="detail-title" hidden>

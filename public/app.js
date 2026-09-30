@@ -3,6 +3,27 @@ const navButtons = [...document.querySelectorAll('[data-nav]')];
 const backdrop = document.querySelector('.backdrop');
 const sheets = [...document.querySelectorAll('.bottom-sheet')];
 const toast = document.querySelector('.toast');
+const storageKey = 'heyu-booking-demo-v1';
+
+function loadDemoState() {
+  try {
+    return JSON.parse(localStorage.getItem(storageKey)) ?? { bookings: [], members: [] };
+  } catch {
+    return { bookings: [], members: [] };
+  }
+}
+
+const demoState = loadDemoState();
+
+function saveDemoState() {
+  localStorage.setItem(storageKey, JSON.stringify(demoState));
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>'"]/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+  })[character]);
+}
 
 function showScreen(name) {
   screens.forEach((screen) => screen.classList.toggle('is-active', screen.dataset.screen === name));
@@ -15,7 +36,7 @@ function openSheet(sheet) {
   backdrop.hidden = false;
   sheet.hidden = false;
   document.body.style.overflow = 'hidden';
-  sheet.querySelector('button')?.focus();
+  sheet.querySelector('input, select, button')?.focus();
 }
 
 function closeSheets() {
@@ -32,15 +53,77 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
 }
 
+function renderSavedBookings() {
+  document.querySelectorAll('.booking-row.local-entry').forEach((element) => element.remove());
+  const timeline = document.querySelector('#booking-timeline');
+  demoState.bookings
+    .slice()
+    .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
+    .forEach((booking) => {
+      const row = document.createElement('article');
+      row.className = `booking-row local-entry${booking.therapist ? '' : ' attention'}`;
+      const party = booking.partySize === '2' ? '雙人' : '單人';
+      const teacher = booking.therapist ? `老師：${escapeHtml(booking.therapist)}` : '尚未指派老師';
+      row.innerHTML = `
+        <time>${escapeHtml(booking.time)}</time><span class="line-dot"></span>
+        <button class="booking-card" type="button" data-demo-booking="${escapeHtml(booking.id)}">
+          <span class="booking-top"><strong>${escapeHtml(booking.customer)}</strong><span class="status ${booking.therapist ? 'status-ready' : 'status-alert'}">${booking.therapist ? '已確認' : '待指派'}</span></span>
+          <small>${party}・${escapeHtml(booking.service)}・${escapeHtml(booking.date)}</small><span class="therapist">${teacher}</span>
+        </button>`;
+      timeline.append(row);
+    });
+}
+
+function renderSavedMembers() {
+  document.querySelectorAll('.member-card.local-entry').forEach((element) => element.remove());
+  const list = document.querySelector('#member-list');
+  demoState.members.forEach((member) => {
+    const button = document.createElement('button');
+    button.className = 'member-card card local-entry';
+    button.type = 'button';
+    button.dataset.name = `${member.name} ${member.phone}`;
+    button.innerHTML = `<span class="member-avatar">${escapeHtml(member.name.slice(0, 1))}</span><span><strong>${escapeHtml(member.name)}</strong><small>${escapeHtml(member.phone || '未填手機')}</small><em>測試會員・尚未綁定 LINE</em></span><span class="chevron">›</span>`;
+    list.append(button);
+  });
+}
+
+function setDefaultBookingDate() {
+  const form = document.querySelector('#booking-form');
+  const now = new Date();
+  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+  form.elements.date.value = localDate;
+  form.elements.time.value = '10:00';
+}
+
+const today = new Intl.DateTimeFormat('zh-TW', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date());
+document.querySelector('#today-label').textContent = today;
+setDefaultBookingDate();
+renderSavedBookings();
+renderSavedMembers();
+
 document.addEventListener('click', (event) => {
   const target = event.target.closest('button');
   if (!target) return;
   if (target.dataset.nav) showScreen(target.dataset.nav);
   if (target.dataset.go) showScreen(target.dataset.go);
   if (target.hasAttribute('data-open-create')) openSheet(document.querySelector('#create-sheet'));
+  if (target.hasAttribute('data-open-booking-form')) openSheet(document.querySelector('#booking-form-sheet'));
+  if (target.hasAttribute('data-open-member-form')) openSheet(document.querySelector('#member-form-sheet'));
   if (target.hasAttribute('data-open-detail')) openSheet(document.querySelector('#detail-sheet'));
   if (target.hasAttribute('data-close-sheet')) closeSheets();
   if (target.dataset.toast) showToast(target.dataset.toast);
+  if (target.dataset.demoBooking) {
+    const booking = demoState.bookings.find((item) => item.id === target.dataset.demoBooking);
+    if (booking) showToast(`${booking.customer}・${booking.date} ${booking.time}`);
+  }
+  if (target.hasAttribute('data-reset-demo')) {
+    localStorage.removeItem(storageKey);
+    demoState.bookings = [];
+    demoState.members = [];
+    renderSavedBookings();
+    renderSavedMembers();
+    showToast('本機測試資料已重設');
+  }
 });
 
 backdrop.addEventListener('click', closeSheets);
@@ -72,4 +155,29 @@ memberSearch.addEventListener('input', () => {
     if (match) visible += 1;
   });
   document.querySelector('#member-empty').hidden = visible !== 0;
+});
+
+document.querySelector('#booking-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(event.currentTarget));
+  demoState.bookings.push({ id: crypto.randomUUID(), ...values });
+  saveDemoState();
+  renderSavedBookings();
+  event.currentTarget.reset();
+  setDefaultBookingDate();
+  closeSheets();
+  showScreen('bookings');
+  showToast('測試預約已建立');
+});
+
+document.querySelector('#member-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(event.currentTarget));
+  demoState.members.push({ id: crypto.randomUUID(), ...values });
+  saveDemoState();
+  renderSavedMembers();
+  event.currentTarget.reset();
+  closeSheets();
+  showScreen('members');
+  showToast('測試會員已建立');
 });

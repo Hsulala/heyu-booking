@@ -337,6 +337,8 @@ DECLARE
     v_duration INTEGER;
     v_buffer INTEGER;
     v_price INTEGER;
+    v_extra_minutes INTEGER;
+    v_addon_total INTEGER;
 BEGIN
     SELECT * INTO STRICT v_group
       FROM booking_groups
@@ -366,11 +368,23 @@ BEGIN
         NEW.service_price_snapshot := v_price;
     END IF;
 
+    -- This function is the single source of truth for booking duration and price.
+    -- Re-read existing addon snapshots so changing a discount, group status or
+    -- start time never silently drops addon minutes or value.
+    SELECT COALESCE(SUM(extra_minutes_snapshot * qty), 0),
+           COALESCE(SUM(price_snapshot * qty), 0)
+      INTO v_extra_minutes, v_addon_total
+      FROM booking_addons
+     WHERE booking_item_id = NEW.id;
+
     NEW.end_time := NEW.start_time
-        + (NEW.service_duration_snapshot * interval '1 minute');
+        + ((NEW.service_duration_snapshot + v_extra_minutes) * interval '1 minute');
     NEW.occupied_until := NEW.end_time
         + (NEW.buffer_minutes_snapshot * interval '1 minute');
-    NEW.total_amount := GREATEST(NEW.service_price_snapshot - NEW.discount_amount, 0);
+    NEW.total_amount := GREATEST(
+        NEW.service_price_snapshot + v_addon_total - NEW.discount_amount,
+        0
+    );
     NEW.updated_at := now();
     RETURN NEW;
 END;
@@ -407,22 +421,11 @@ CREATE TRIGGER trg_prepare_booking_addon
 CREATE OR REPLACE FUNCTION recalc_booking_item() RETURNS TRIGGER AS $$
 DECLARE
     v_item_id BIGINT := COALESCE(NEW.booking_item_id, OLD.booking_item_id);
-    v_extra_minutes INTEGER;
-    v_addon_total INTEGER;
 BEGIN
-    SELECT COALESCE(SUM(extra_minutes_snapshot * qty), 0),
-           COALESCE(SUM(price_snapshot * qty), 0)
-      INTO v_extra_minutes, v_addon_total
-      FROM booking_addons
-     WHERE booking_item_id = v_item_id;
-
+    -- Touch a watched column so prepare_booking_item() performs the one
+    -- canonical calculation, including every current addon snapshot.
     UPDATE booking_items
-       SET end_time = start_time
-                    + ((service_duration_snapshot + v_extra_minutes) * interval '1 minute'),
-           occupied_until = start_time
-                    + ((service_duration_snapshot + v_extra_minutes + buffer_minutes_snapshot) * interval '1 minute'),
-           total_amount = GREATEST(service_price_snapshot + v_addon_total - discount_amount, 0),
-           updated_at = now()
+       SET discount_amount = discount_amount
      WHERE id = v_item_id;
     RETURN NULL;
 END;
@@ -449,7 +452,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_recalc_booking_group_after_item
-    AFTER INSERT OR UPDATE OF occupied_until OR DELETE ON booking_items
+    AFTER INSERT OR UPDATE OR DELETE ON booking_items
     FOR EACH ROW EXECUTE FUNCTION recalc_booking_group_occupied_until();
 
 CREATE OR REPLACE FUNCTION sync_booking_group_to_items() RETURNS TRIGGER AS $$

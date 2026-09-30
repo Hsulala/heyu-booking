@@ -39,6 +39,8 @@ test('schema installs and enforces the core booking rules in PostgreSQL', async 
       INSERT INTO therapist_services (therapist_id, service_id, business_id)
         VALUES (1, 1, 1);
       INSERT INTO beds (id, branch_id, label) VALUES (1, 1, '1號床'), (2, 1, '2號床');
+      INSERT INTO addons (id, business_id, name, price, extra_minutes)
+        VALUES (1, 1, '延長 30 分鐘', 300, 30);
       INSERT INTO customers (id, business_id, line_user_id, name)
         VALUES (1, 1, 'U-primary', '主要客人');
     `);
@@ -82,6 +84,24 @@ test('schema installs and enforces the core booking rules in PostgreSQL', async 
     assert.equal(snapshot.rows[0].buffer_minutes_snapshot, 30);
     assert.equal(snapshot.rows[0].service_price_snapshot, 1800);
     assert.equal(snapshot.rows[0].is_blocking, true);
+
+    await db.exec(`
+      INSERT INTO booking_addons (booking_item_id, addon_id, qty, addon_name_snapshot, price_snapshot, extra_minutes_snapshot)
+      VALUES (1, 1, 1, 'placeholder', 0, 0);
+      UPDATE booking_items SET discount_amount = 100 WHERE id = 1;
+      UPDATE booking_groups SET status = 'in_service' WHERE id = 1;
+    `);
+
+    const addonSnapshot = await db.query(`
+      SELECT bi.end_time, bi.occupied_until, bi.total_amount, bg.occupied_until AS group_occupied_until
+      FROM booking_items bi
+      JOIN booking_groups bg ON bg.id = bi.booking_group_id
+      WHERE bi.id = 1
+    `);
+    assert.equal(new Date(addonSnapshot.rows[0].end_time).toISOString(), '2026-10-10T03:30:00.000Z');
+    assert.equal(new Date(addonSnapshot.rows[0].occupied_until).toISOString(), '2026-10-10T04:00:00.000Z');
+    assert.equal(new Date(addonSnapshot.rows[0].group_occupied_until).toISOString(), '2026-10-10T04:00:00.000Z');
+    assert.equal(addonSnapshot.rows[0].total_amount, 2000);
 
     await assert.rejects(
       db.exec(`

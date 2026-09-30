@@ -54,3 +54,13 @@ test('brand palette uses milk-tea and coffee colors', async () => {
   assert.match(css, /--brand: #9a6a3e/);
   assert.doesNotMatch(css, /--brand: #536c60/);
 });
+
+test('owner test build can create local bookings and members without implying production persistence', async () => {
+  const [html, js] = await Promise.all([readFile(files.html, 'utf8'), readFile(files.js, 'utf8')]);
+  assert.match(html, /id="booking-form"/);
+  assert.match(html, /id="member-form"/);
+  assert.match(html, /測試版資料只會保存在這台裝置的瀏覽器/);
+  assert.match(js, /localStorage\.setItem/);
+  assert.match(js, /crypto\.randomUUID/);
+  assert.match(js, /data-reset-demo/);
+});

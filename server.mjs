@@ -13,6 +13,13 @@ const contentTypes = {
 
 const server = createServer((request, response) => {
   const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
+
+  if (pathname === '/healthz') {
+    response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    response.end(JSON.stringify({ status: 'ok' }));
+    return;
+  }
+
   const requested = pathname === '/' ? '/index.html' : pathname;
   const safePath = normalize(requested).replace(/^(\.\.(\/|\\|$))+/, '');
   const filePath = join(publicDir, safePath);
@@ -26,6 +33,9 @@ const server = createServer((request, response) => {
   response.writeHead(200, {
     'Cache-Control': 'no-store',
     'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream',
+    'Referrer-Policy': 'no-referrer',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
   });
   createReadStream(filePath).pipe(response);
 });
