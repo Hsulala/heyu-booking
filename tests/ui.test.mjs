@@ -86,8 +86,22 @@ test('customer booking entry initializes LIFF and delegates identity verificatio
 });
 
 test('admin loads protected LINE booking requests from the backend', async () => {
-  const js = await readFile(files.js, 'utf8');
+  const [html, js] = await Promise.all([readFile(files.html, 'utf8'), readFile(files.js, 'utf8')]);
   assert.match(js, /\/api\/admin\/bookings/);
   assert.match(js, /X-Admin-Key/);
   assert.match(js, /LINE 新預約/);
+  assert.match(js, /\/status/);
+  assert.match(html, /data-booking-status="confirmed"/);
+  assert.match(html, /data-booking-status="rejected"/);
+});
+
+test('desktop sidebar exposes editable operating settings', async () => {
+  const [html, css, js] = await Promise.all([readFile(files.html, 'utf8'), readFile(files.css, 'utf8'), readFile(files.js, 'utf8')]);
+  for (const setting of ['services', 'therapists', 'hours', 'rewards', 'reminders', 'branches']) {
+    assert.match(html, new RegExp(`data-setting="${setting}"`));
+  }
+  assert.match(css, /desktop-settings-nav/);
+  assert.match(js, /heyu-settings-v1/);
+  assert.match(js, /setting-form/);
+  assert.match(js, /\/api\/admin\/settings/);
 });

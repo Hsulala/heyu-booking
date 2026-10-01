@@ -5,6 +5,18 @@ const sheets = [...document.querySelectorAll('.bottom-sheet')];
 const toast = document.querySelector('.toast');
 const storageKey = 'heyu-booking-demo-v1';
 const adminKeyStorage = 'heyu-admin-key';
+const settingsStorage = 'heyu-settings-v1';
+let serverBookings = [];
+let selectedServerBookingId = '';
+
+const settingDefinitions = {
+  services: { title: '療程與緩衝時間', fields: [['serviceName', '療程名稱', '身體精油按摩'], ['duration', '服務分鐘', '60'], ['buffer', '緩衝分鐘', '30']] },
+  therapists: { title: '老師與可服務項目', fields: [['therapistNames', '老師名單', '小君、Amy、Kelly'], ['skills', '可服務療程', '精油按摩、深層舒壓、筋膜刀']] },
+  hours: { title: '營業時間與休假', fields: [['openTime', '開始營業', '10:00'], ['closeTime', '結束營業', '21:00'], ['closedDays', '固定休假', '依店內公告']] },
+  rewards: { title: '點數、優惠券與堂數包', fields: [['pointsRate', '每 NT$100 回饋點數', '1'], ['coupon', '目前優惠', '新客體驗優惠'], ['packages', '堂數包', '精油按摩 10 堂']] },
+  reminders: { title: '提醒與爽約規則', fields: [['reminderHours', '提前提醒小時', '24'], ['cancelHours', '可取消期限（小時）', '12'], ['noShowRule', '爽約規則', '請與店家聯絡']] },
+  branches: { title: '分店管理', fields: [['branchName', '分店名稱', '禾域本店'], ['address', '地址', '請填寫地址'], ['phone', '分店電話', '請填寫電話']] },
+};
 
 function loadDemoState() {
   try {
@@ -77,6 +89,7 @@ function renderSavedBookings() {
 }
 
 function renderServerBookings(bookings) {
+  serverBookings = bookings;
   document.querySelectorAll('.booking-row.remote-entry').forEach((element) => element.remove());
   const timeline = document.querySelector('#booking-timeline');
   bookings
@@ -84,17 +97,82 @@ function renderServerBookings(bookings) {
     .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
     .forEach((booking) => {
       const row = document.createElement('article');
-      row.className = 'booking-row remote-entry attention';
+      row.className = `booking-row remote-entry${booking.status === 'pending' ? ' attention' : ''}`;
       const party = booking.partySize === '2' ? '雙人' : '單人';
       const teacher = booking.therapist ? `指定老師：${escapeHtml(booking.therapist)}` : '老師：不指定・待店家確認';
       row.innerHTML = `
         <time>${escapeHtml(booking.time)}</time><span class="line-dot"></span>
-        <button class="booking-card" type="button" data-toast="${escapeHtml(booking.phone)}${booking.note ? `・${escapeHtml(booking.note)}` : ''}">
-          <span class="booking-top"><strong>${escapeHtml(booking.customer)}</strong><span class="status status-alert">LINE 新預約</span></span>
+        <button class="booking-card" type="button" data-server-booking="${escapeHtml(booking.id)}">
+          <span class="booking-top"><strong>${escapeHtml(booking.customer)}</strong><span class="status ${booking.status === 'confirmed' ? 'status-ready' : booking.status === 'rejected' ? '' : 'status-alert'}">${booking.status === 'confirmed' ? '已確認' : booking.status === 'rejected' ? '已拒絕' : 'LINE 新預約'}</span></span>
           <small>${party}・${escapeHtml(booking.service)}・${escapeHtml(booking.date)}</small><span class="therapist">${teacher}</span>
         </button>`;
       timeline.prepend(row);
     });
+}
+
+function openServerBooking(bookingId) {
+  const booking = serverBookings.find((item) => item.id === bookingId);
+  if (!booking) return;
+  selectedServerBookingId = bookingId;
+  document.querySelector('#detail-title').textContent = `${booking.customer}・${booking.time}`;
+  document.querySelector('.detail-list').innerHTML = `
+    <div><dt>日期</dt><dd>${escapeHtml(booking.date)}</dd></div>
+    <div><dt>人數</dt><dd>${booking.partySize === '2' ? '雙人' : '單人'}</dd></div>
+    <div><dt>療程</dt><dd>${escapeHtml(booking.service)}</dd></div>
+    <div><dt>老師</dt><dd>${escapeHtml(booking.therapist || '不指定')}</dd></div>
+    <div><dt>手機</dt><dd>${escapeHtml(booking.phone)}</dd></div>
+    <div><dt>備註</dt><dd>${escapeHtml(booking.note || '無')}</dd></div>`;
+  document.querySelector('#detail-actions').hidden = booking.status !== 'pending';
+  openSheet(document.querySelector('#detail-sheet'));
+}
+
+function loadSettings() {
+  try { return JSON.parse(localStorage.getItem(settingsStorage)) ?? {}; } catch { return {}; }
+}
+
+async function openSetting(key) {
+  const definition = settingDefinitions[key];
+  if (!definition) return;
+  let settings = loadSettings();
+  let adminKey = sessionStorage.getItem(adminKeyStorage);
+  if (!adminKey) {
+    adminKey = window.prompt('請輸入 Railway 設定的後台存取碼');
+    if (adminKey) sessionStorage.setItem(adminKeyStorage, adminKey);
+  }
+  if (adminKey) {
+    try {
+      const response = await fetch('/api/admin/settings', { cache: 'no-store', headers: { 'X-Admin-Key': adminKey } });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || '無法讀取設定');
+      settings = result.settings;
+      localStorage.setItem(settingsStorage, JSON.stringify(settings));
+    } catch (error) { showToast(error.message); }
+  }
+  const saved = settings[key] ?? {};
+  const form = document.querySelector('#setting-form');
+  form.dataset.setting = key;
+  document.querySelector('#setting-title').textContent = definition.title;
+  document.querySelector('#setting-fields').innerHTML = definition.fields.map(([name, label, fallback]) => `
+    <label class="field full"><span>${label}</span><input name="${name}" value="${escapeHtml(saved[name] ?? fallback)}" required /></label>`).join('');
+  document.querySelectorAll('[data-setting]').forEach((button) => button.classList.toggle('is-active', button.dataset.setting === key));
+  openSheet(document.querySelector('#setting-sheet'));
+}
+
+async function updateServerBookingStatus(status) {
+  const adminKey = sessionStorage.getItem(adminKeyStorage);
+  if (!adminKey || !selectedServerBookingId) return;
+  try {
+    const response = await fetch(`/api/admin/bookings/${encodeURIComponent(selectedServerBookingId)}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
+      body: JSON.stringify({ status }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '更新預約失敗');
+    closeSheets();
+    await loadServerBookings(false);
+    showToast(`${status === 'confirmed' ? '已確認' : '已拒絕'}預約${result.lineNotification ? '，並已通知客人' : '，但 LINE 通知失敗'}`);
+  } catch (error) { showToast(error.message); }
 }
 
 let loadingServerBookings = false;
@@ -170,7 +248,17 @@ document.addEventListener('click', (event) => {
   if (target.hasAttribute('data-open-create')) openSheet(document.querySelector('#create-sheet'));
   if (target.hasAttribute('data-open-booking-form')) openSheet(document.querySelector('#booking-form-sheet'));
   if (target.hasAttribute('data-open-member-form')) openSheet(document.querySelector('#member-form-sheet'));
-  if (target.hasAttribute('data-open-detail')) openSheet(document.querySelector('#detail-sheet'));
+  if (target.hasAttribute('data-open-detail')) {
+    selectedServerBookingId = '';
+    document.querySelector('#detail-actions').hidden = true;
+    openSheet(document.querySelector('#detail-sheet'));
+  }
+  if (target.dataset.serverBooking) openServerBooking(target.dataset.serverBooking);
+  if (target.dataset.bookingStatus) updateServerBookingStatus(target.dataset.bookingStatus);
+  if (target.dataset.setting) {
+    showScreen('more');
+    openSetting(target.dataset.setting);
+  }
   if (target.hasAttribute('data-close-sheet')) closeSheets();
   if (target.dataset.toast) showToast(target.dataset.toast);
   if (target.dataset.demoBooking) {
@@ -241,4 +329,29 @@ document.querySelector('#member-form').addEventListener('submit', (event) => {
   closeSheets();
   showScreen('members');
   showToast('測試會員已建立');
+});
+
+document.querySelector('#setting-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const key = event.currentTarget.dataset.setting;
+  const values = Object.fromEntries(new FormData(event.currentTarget));
+  const adminKey = sessionStorage.getItem(adminKeyStorage);
+  if (!adminKey) {
+    showToast('請先輸入後台存取碼');
+    return;
+  }
+  const settings = loadSettings();
+  try {
+    const response = await fetch('/api/admin/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
+      body: JSON.stringify({ key, values }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '設定儲存失敗');
+    settings[key] = values;
+    localStorage.setItem(settingsStorage, JSON.stringify(settings));
+    closeSheets();
+    showToast(`${settingDefinitions[key].title}已儲存`);
+  } catch (error) { showToast(error.message); }
 });

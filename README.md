@@ -63,9 +63,12 @@ LINE_LOGIN_CHANNEL_SECRET
 LINE_MESSAGING_CHANNEL_SECRET
 LINE_MESSAGING_CHANNEL_ACCESS_TOKEN
 ADMIN_ACCESS_KEY
+DATA_FILE
 ```
 
 `ADMIN_ACCESS_KEY` 請自行設定一組不容易猜到的存取碼，店家進入預約頁時用它讀取真實測試預約。
+
+若要讓測試預約在重新啟動後仍保留，請在 Railway 加入 Volume、掛載到 `/data`，並設定 `DATA_FILE=/data/bookings.json`。未設定時資料只暫存在執行中的伺服器記憶體。
 
 LINE Developers Console 的 LIFF Endpoint URL 使用 `/booking`。Messaging API 頁籤的 Webhook URL 請設定為：
 

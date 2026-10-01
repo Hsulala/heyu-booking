@@ -113,6 +113,7 @@ h2 { margin-bottom: 0; font-size: 21px; letter-spacing: -.02em; }
 .bottom-nav .is-active { color: var(--brand-dark); font-weight: 800; }
 .bottom-nav .create-button { position: relative; top: -18px; color: var(--brand-dark); font-weight: 800; }
 .bottom-nav .create-button > span { display: grid; place-items: center; width: 54px; height: 54px; color: white; border: 5px solid var(--bg); border-radius: 50%; background: var(--brand); box-shadow: 0 8px 22px rgba(104,67,40,.24); font-size: 28px; font-weight: 400; }
+.desktop-settings-nav { display: none; }
 
 .backdrop { position: fixed; z-index: 40; inset: 0; background: rgba(62,40,26,.42); backdrop-filter: blur(2px); }
 .bottom-sheet { position: fixed; z-index: 50; right: 0; bottom: 0; left: 0; padding: 10px 20px calc(22px + env(safe-area-inset-bottom)); border-radius: 28px 28px 0 0; background: var(--surface); box-shadow: 0 -16px 50px rgba(78,50,30,.17); animation: sheet-up .25s ease; }
@@ -213,6 +214,9 @@ h2 { margin-bottom: 0; font-size: 21px; letter-spacing: -.02em; }
     box-shadow: none;
     font-size: 24px;
   }
+  .desktop-settings-nav { display: grid; gap: 3px; margin: 4px 0 0 32px; padding-left: 12px; border-left: 1px solid var(--line); }
+  .desktop-settings-nav button { display: block; min-height: 36px; padding: 0 10px; color: var(--muted); font-size: 12px; }
+  .desktop-settings-nav button.is-active { color: var(--brand-dark); background: var(--brand-soft); font-weight: 800; }
 
   .bottom-sheet {
     top: 50%;

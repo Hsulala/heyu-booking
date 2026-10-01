@@ -14,7 +14,7 @@
           <p class="eyebrow">HEYU 店家後台 <span class="demo-badge">測試版</span></p>
           <p class="store-name">禾域</p>
         </div>
-        <button class="avatar" type="button" aria-label="開啟帳號選單">闆</button>
+        <button class="avatar" type="button" aria-label="開啟帳號選單" data-toast="目前登入身分：店長">闆</button>
       </header>
 
       <main id="main-content">
@@ -126,13 +126,13 @@
           <div class="page-title"><div><p class="eyebrow">顧客關係</p><h1 id="members-title">會員</h1></div></div>
           <label class="search-box"><span aria-hidden="true">⌕</span><input id="member-search" type="search" placeholder="搜尋姓名或手機末三碼" /></label>
           <div class="member-list" id="member-list">
-            <button class="member-card card" type="button" data-name="陳怡安 678">
+            <button class="member-card card" type="button" data-name="陳怡安 678" data-toast="已開啟陳怡安的會員摘要">
               <span class="member-avatar">陳</span><span><strong>陳怡安</strong><small>最近到店：9/18</small><em>點數 320・精油按摩 3 堂</em></span><span class="chevron">›</span>
             </button>
-            <button class="member-card card" type="button" data-name="林郁晴 216">
+            <button class="member-card card" type="button" data-name="林郁晴 216" data-toast="已開啟林郁晴的會員摘要">
               <span class="member-avatar">林</span><span><strong>林郁晴</strong><small>最近到店：9/12</small><em>點數 80・無堂數包</em></span><span class="chevron">›</span>
             </button>
-            <button class="member-card card" type="button" data-name="張芷寧 509">
+            <button class="member-card card" type="button" data-name="張芷寧 509" data-toast="已開啟張芷寧的會員摘要">
               <span class="member-avatar">張</span><span><strong>張芷寧</strong><small>首次預約：今天</small><em>新會員・待填問卷</em></span><span class="chevron">›</span>
             </button>
           </div>
@@ -142,12 +142,12 @@
         <section class="screen" data-screen="more" aria-labelledby="more-title">
           <div class="page-title"><div><p class="eyebrow">營運設定</p><h1 id="more-title">更多</h1></div></div>
           <div class="settings-list card">
-            <button type="button"><span>療程與緩衝時間</span><span>›</span></button>
-            <button type="button"><span>老師與可服務項目</span><span>›</span></button>
-            <button type="button"><span>營業時間與休假</span><span>›</span></button>
-            <button type="button"><span>點數、優惠券與堂數包</span><span>›</span></button>
-            <button type="button"><span>提醒與爽約規則</span><span>›</span></button>
-            <button type="button"><span>分店管理</span><span>›</span></button>
+            <button type="button" data-setting="services"><span>療程與緩衝時間</span><span>›</span></button>
+            <button type="button" data-setting="therapists"><span>老師與可服務項目</span><span>›</span></button>
+            <button type="button" data-setting="hours"><span>營業時間與休假</span><span>›</span></button>
+            <button type="button" data-setting="rewards"><span>點數、優惠券與堂數包</span><span>›</span></button>
+            <button type="button" data-setting="reminders"><span>提醒與爽約規則</span><span>›</span></button>
+            <button type="button" data-setting="branches"><span>分店管理</span><span>›</span></button>
             <button type="button" data-reset-demo><span>重設本機測試資料</span><span>↺</span></button>
           </div>
           <p class="prototype-note">這是操作原型，設定項目會在下一階段接上實際資料。</p>
@@ -160,6 +160,14 @@
         <button class="create-button" type="button" data-open-create aria-label="新增預約"><span>＋</span>新增</button>
         <button type="button" data-nav="members"><span>♙</span>會員</button>
         <button type="button" data-nav="more"><span>•••</span>更多</button>
+        <div class="desktop-settings-nav" aria-label="營運設定">
+          <button type="button" data-setting="services">療程與緩衝</button>
+          <button type="button" data-setting="therapists">老師與服務</button>
+          <button type="button" data-setting="hours">營業時間</button>
+          <button type="button" data-setting="rewards">優惠與點數</button>
+          <button type="button" data-setting="reminders">提醒規則</button>
+          <button type="button" data-setting="branches">分店管理</button>
+        </div>
       </nav>
     </div>
 
@@ -169,7 +177,7 @@
       <div class="sheet-header"><div><p class="eyebrow">快速操作</p><h2 id="create-title">新增</h2></div><button type="button" data-close-sheet aria-label="關閉">×</button></div>
       <button class="sheet-action primary-action" type="button" data-open-booking-form><span>＋</span><span><strong>新增預約</strong><small>建立單人或雙人預約</small></span></button>
       <button class="sheet-action" type="button" data-open-member-form><span>♙</span><span><strong>新增會員</strong><small>先建立會員基本資料</small></span></button>
-      <button class="sheet-action" type="button"><span>休</span><span><strong>新增休假</strong><small>封鎖老師或全店時段</small></span></button>
+      <button class="sheet-action" type="button" data-toast="請從營業時間與休假設定管理休假"><span>休</span><span><strong>新增休假</strong><small>封鎖老師或全店時段</small></span></button>
     </section>
 
     <section class="bottom-sheet form-sheet" id="booking-form-sheet" role="dialog" aria-modal="true" aria-labelledby="booking-form-title" hidden>
@@ -206,7 +214,12 @@
       <div class="sheet-handle"></div>
       <div class="sheet-header"><div><p class="eyebrow">預約詳情</p><h2 id="detail-title">陳小姐・10:00</h2></div><button type="button" data-close-sheet aria-label="關閉">×</button></div>
       <dl class="detail-list"><div><dt>人數</dt><dd>單人</dd></div><div><dt>療程</dt><dd>身體精油按摩 60 分</dd></div><div><dt>老師</dt><dd>小君</dd></div><div><dt>使用資源</dt><dd>第 1 床・緩衝至 11:30</dd></div></dl>
-      <div class="detail-actions"><button type="button">聯絡客人</button><button class="primary-small" type="button">辦理報到</button></div>
+      <div class="detail-actions" id="detail-actions"><button type="button" data-booking-status="rejected">拒絕預約</button><button class="primary-small" type="button" data-booking-status="confirmed">確認預約</button></div>
+    </section>
+    <section class="bottom-sheet form-sheet" id="setting-sheet" role="dialog" aria-modal="true" aria-labelledby="setting-title" hidden>
+      <div class="sheet-handle"></div>
+      <div class="sheet-header"><div><p class="eyebrow">營運設定</p><h2 id="setting-title">設定</h2></div><button type="button" data-close-sheet aria-label="關閉">×</button></div>
+      <form id="setting-form"><div class="form-grid" id="setting-fields"></div><p class="form-help">設定會同步保存到店家後台；使用 Railway Volume 時重新部署後仍會保留。</p><button class="submit-button" type="submit">儲存設定</button></form>
     </section>
     <div class="toast" role="status" aria-live="polite"></div>
     <script src="./app.js" defer></script>

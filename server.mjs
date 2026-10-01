@@ -1,12 +1,43 @@
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { extname, join, normalize } from 'node:path';
+import { dirname, extname, join, normalize } from 'node:path';
 import { pushLineMessage, replyLineMessage, verifyLineIdToken, verifyWebhookSignature } from './lib/line.mjs';
 
 const port = Number(process.env.PORT || 3000);
 const publicDir = join(import.meta.dirname, 'public');
-const bookingRequests = [];
+const dataFile = process.env.DATA_FILE ?? '';
+const settingsFile = dataFile ? `${dataFile}.settings` : '';
+
+function loadBookingRequests() {
+  if (!dataFile || !existsSync(dataFile)) return [];
+  try {
+    const value = JSON.parse(readFileSync(dataFile, 'utf8'));
+    return Array.isArray(value) ? value : [];
+  } catch (error) {
+    console.error('Booking data load error:', error.message);
+    return [];
+  }
+}
+
+const bookingRequests = loadBookingRequests();
+let operatingSettings = {};
+if (settingsFile && existsSync(settingsFile)) {
+  try { operatingSettings = JSON.parse(readFileSync(settingsFile, 'utf8')) ?? {}; }
+  catch (error) { console.error('Settings data load error:', error.message); }
+}
+
+function saveBookingRequests() {
+  if (!dataFile) return;
+  mkdirSync(dirname(dataFile), { recursive: true });
+  writeFileSync(dataFile, JSON.stringify(bookingRequests, null, 2), { mode: 0o600 });
+}
+
+function saveOperatingSettings() {
+  if (!settingsFile) return;
+  mkdirSync(dirname(settingsFile), { recursive: true });
+  writeFileSync(settingsFile, JSON.stringify(operatingSettings, null, 2), { mode: 0o600 });
+}
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -74,6 +105,7 @@ async function handleCreateBooking(request, response) {
     }
     if (!booking.customer || !booking.phone || !booking.service) throw new Error('預約資料不完整');
     bookingRequests.push(booking);
+    saveBookingRequests();
 
     const party = booking.partySize === '2' ? '雙人' : '單人';
     const confirmation = [
@@ -116,6 +148,73 @@ function handleListBookings(request, response) {
     return;
   }
   json(response, 200, { bookings: bookingRequests.slice().reverse() });
+}
+
+function hasAdminAccess(request) {
+  return Boolean(process.env.ADMIN_ACCESS_KEY)
+    && request.headers['x-admin-key'] === process.env.ADMIN_ACCESS_KEY;
+}
+
+async function handleUpdateBooking(request, response, bookingId) {
+  if (!hasAdminAccess(request)) {
+    json(response, 401, { error: '後台存取碼不正確' });
+    return;
+  }
+  try {
+    const rawBody = await readBody(request);
+    const { status } = JSON.parse(rawBody.toString('utf8'));
+    if (!['confirmed', 'rejected'].includes(status)) throw new Error('不支援的預約狀態');
+    const booking = bookingRequests.find((item) => item.id === bookingId);
+    if (!booking) {
+      json(response, 404, { error: '找不到這筆預約' });
+      return;
+    }
+    booking.status = status;
+    booking.updatedAt = new Date().toISOString();
+    saveBookingRequests();
+    const isConfirmed = status === 'confirmed';
+    const message = isConfirmed
+      ? `禾域已確認您的預約 ✅\n${booking.date} ${booking.time}\n${booking.service}\n期待您的到來。`
+      : `禾域暫時無法接受這次預約\n${booking.date} ${booking.time}\n請重新選擇其他時段，或直接與店家聯絡。`;
+    let lineNotification = true;
+    try {
+      await pushLineMessage(
+        booking.lineUserId,
+        [{ type: 'text', text: message }],
+        process.env.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN,
+      );
+    } catch (error) {
+      lineNotification = false;
+      console.error('LINE booking status notification error:', error.message);
+    }
+    json(response, 200, { booking, lineNotification });
+  } catch (error) {
+    json(response, 400, { error: error.message });
+  }
+}
+
+async function handleSettings(request, response) {
+  if (!hasAdminAccess(request)) {
+    json(response, 401, { error: '後台存取碼不正確' });
+    return;
+  }
+  if (request.method === 'GET') {
+    json(response, 200, { settings: operatingSettings });
+    return;
+  }
+  try {
+    const rawBody = await readBody(request);
+    const { key, values } = JSON.parse(rawBody.toString('utf8'));
+    if (!['services', 'therapists', 'hours', 'rewards', 'reminders', 'branches'].includes(key)) {
+      throw new Error('不支援的設定項目');
+    }
+    if (!values || typeof values !== 'object' || Array.isArray(values)) throw new Error('設定格式不正確');
+    operatingSettings = { ...operatingSettings, [key]: values };
+    saveOperatingSettings();
+    json(response, 200, { settings: operatingSettings });
+  } catch (error) {
+    json(response, 400, { error: error.message });
+  }
 }
 
 async function handleLineWebhook(request, response) {
@@ -219,6 +318,15 @@ const server = createServer(async (request, response) => {
   }
   if (request.method === 'GET' && pathname === '/api/admin/bookings') {
     handleListBookings(request, response);
+    return;
+  }
+  const bookingStatusMatch = pathname.match(/^\/api\/admin\/bookings\/([^/]+)\/status$/);
+  if (request.method === 'PATCH' && bookingStatusMatch) {
+    await handleUpdateBooking(request, response, decodeURIComponent(bookingStatusMatch[1]));
+    return;
+  }
+  if ((request.method === 'GET' || request.method === 'PUT') && pathname === '/api/admin/settings') {
+    await handleSettings(request, response);
     return;
   }
   if (request.method === 'POST' && pathname === '/webhooks/line') {
