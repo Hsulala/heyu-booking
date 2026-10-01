@@ -1,14 +1,17 @@
 import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { dirname, extname, join, normalize } from 'node:path';
 import { pushLineMessage, replyLineMessage, verifyLineIdToken, verifyWebhookSignature } from './lib/line.mjs';
+import { hashPassword, verifyPassword } from './lib/admin-auth.mjs';
 
 const port = Number(process.env.PORT || 3000);
 const publicDir = join(import.meta.dirname, 'public');
 const dataFile = process.env.DATA_FILE ?? '';
 const settingsFile = dataFile ? `${dataFile}.settings` : '';
 const membersFile = dataFile ? `${dataFile}.members` : '';
+const usersFile = dataFile ? `${dataFile}.users` : '';
+const loginAttempts = new Map();
 
 function loadBookingRequests() {
   if (!dataFile || !existsSync(dataFile)) return [];
@@ -24,6 +27,7 @@ function loadBookingRequests() {
 const bookingRequests = loadBookingRequests();
 let operatingSettings = {};
 let members = [];
+let users = [];
 if (settingsFile && existsSync(settingsFile)) {
   try { operatingSettings = JSON.parse(readFileSync(settingsFile, 'utf8')) ?? {}; }
   catch (error) { console.error('Settings data load error:', error.message); }
@@ -33,6 +37,12 @@ if (membersFile && existsSync(membersFile)) {
     const value = JSON.parse(readFileSync(membersFile, 'utf8'));
     members = Array.isArray(value) ? value : [];
   } catch (error) { console.error('Member data load error:', error.message); }
+}
+if (usersFile && existsSync(usersFile)) {
+  try {
+    const value = JSON.parse(readFileSync(usersFile, 'utf8'));
+    users = Array.isArray(value) ? value : [];
+  } catch (error) { console.error('User data load error:', error.message); }
 }
 
 function saveBookingRequests() {
@@ -50,11 +60,24 @@ function saveMembers() {
   writeJsonFile(membersFile, members);
 }
 
+function saveUsers() {
+  if (!usersFile) return;
+  writeJsonFile(usersFile, users);
+}
+
 function writeJsonFile(filePath, value) {
   mkdirSync(dirname(filePath), { recursive: true });
   const temporaryPath = `${filePath}.${process.pid}.tmp`;
   writeFileSync(temporaryPath, JSON.stringify(value, null, 2), { mode: 0o600 });
   renameSync(temporaryPath, filePath);
+}
+
+if (!users.length && process.env.ADMIN_ACCESS_KEY) {
+  users.push({
+    id: randomUUID(), username: 'owner', displayName: '店主', role: 'owner', active: true, sessionVersion: 1,
+    passwordHash: hashPassword(process.env.ADMIN_ACCESS_KEY), createdAt: new Date().toISOString(),
+  });
+  saveUsers();
 }
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -63,13 +86,141 @@ const contentTypes = {
   '.svg': 'image/svg+xml',
 };
 
-function json(response, status, value) {
+function json(response, status, value, extraHeaders = {}) {
   response.writeHead(status, {
     'Cache-Control': 'no-store',
     'Content-Type': 'application/json; charset=utf-8',
     'X-Content-Type-Options': 'nosniff',
+    ...extraHeaders,
   });
   response.end(JSON.stringify(value));
+}
+
+function publicUser(user) {
+  return { id: user.id, username: user.username, displayName: user.displayName, role: user.role, active: user.active };
+}
+
+function parseCookies(request) {
+  return Object.fromEntries(String(request.headers.cookie ?? '').split(';').map((part) => part.trim()).filter(Boolean).map((part) => {
+    const index = part.indexOf('=');
+    return [part.slice(0, index), decodeURIComponent(part.slice(index + 1))];
+  }));
+}
+
+function sessionSignature(payload) {
+  return createHmac('sha256', process.env.ADMIN_ACCESS_KEY ?? 'unconfigured').update(payload).digest('base64url');
+}
+
+function createSession(user) {
+  const payload = Buffer.from(JSON.stringify({ userId: user.id, ver: user.sessionVersion ?? 1, exp: Date.now() + 12 * 60 * 60 * 1000 })).toString('base64url');
+  return `${payload}.${sessionSignature(payload)}`;
+}
+
+function sessionUser(request) {
+  const token = parseCookies(request).heyu_session;
+  if (!token) return null;
+  const [payload, signature] = token.split('.');
+  if (!payload || !signature) return null;
+  const expected = Buffer.from(sessionSignature(payload));
+  const received = Buffer.from(signature);
+  if (expected.length !== received.length || !timingSafeEqual(expected, received)) return null;
+  try {
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (data.exp <= Date.now()) return null;
+    return users.find((user) => user.id === data.userId && user.active && (user.sessionVersion ?? 1) === (data.ver ?? 1)) ?? null;
+  } catch { return null; }
+}
+
+function actorFor(request) {
+  const user = sessionUser(request);
+  if (user) return user;
+  if (process.env.ADMIN_ACCESS_KEY && request.headers['x-admin-key'] === process.env.ADMIN_ACCESS_KEY) {
+    return users.find((item) => item.role === 'owner' && item.active) ?? { id: 'legacy-owner', role: 'owner', active: true };
+  }
+  return null;
+}
+
+function hasRole(request, allowedRoles) {
+  const actor = actorFor(request);
+  return Boolean(actor && allowedRoles.includes(actor.role));
+}
+
+function sessionCookie(request, token, maxAge = 43200) {
+  const secure = request.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '';
+  return `heyu_session=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure}`;
+}
+
+async function handleLogin(request, response) {
+  try {
+    const address = String(request.headers['x-forwarded-for'] ?? request.socket.remoteAddress ?? 'unknown').split(',')[0].trim();
+    const attempt = loginAttempts.get(address);
+    if (attempt?.blockedUntil > Date.now()) {
+      json(response, 429, { error: '登入嘗試過多，請稍後再試' });
+      return;
+    }
+    const { username, password } = JSON.parse((await readBody(request)).toString('utf8'));
+    const normalized = cleanText(username, 40).toLowerCase();
+    const user = users.find((item) => item.username.toLowerCase() === normalized && item.active);
+    if (!user || !verifyPassword(String(password ?? ''), user.passwordHash)) {
+      const failures = (attempt?.failures ?? 0) + 1;
+      loginAttempts.set(address, { failures, blockedUntil: failures >= 5 ? Date.now() + 15 * 60 * 1000 : 0 });
+      json(response, 401, { error: '帳號或密碼不正確' });
+      return;
+    }
+    loginAttempts.delete(address);
+    json(response, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookie(request, createSession(user)) });
+  } catch (error) { json(response, 400, { error: error.message }); }
+}
+
+async function handleUsers(request, response) {
+  if (!hasRole(request, ['owner'])) {
+    json(response, 403, { error: '只有店主可以管理帳號' });
+    return;
+  }
+  if (request.method === 'GET') {
+    json(response, 200, { users: users.map(publicUser) });
+    return;
+  }
+  try {
+    const values = JSON.parse((await readBody(request)).toString('utf8'));
+    const username = cleanText(values.username, 40).toLowerCase();
+    const password = String(values.password ?? '');
+    const role = ['owner', 'manager', 'staff'].includes(values.role) ? values.role : 'staff';
+    if (!/^[a-z0-9._-]{3,40}$/.test(username)) throw new Error('帳號需為 3–40 位英數字');
+    if (password.length < 8) throw new Error('密碼至少需要 8 個字元');
+    if (users.some((user) => user.username.toLowerCase() === username)) throw new Error('此帳號已存在');
+    const user = { id: randomUUID(), username, displayName: cleanText(values.displayName, 30) || username, role, active: true, sessionVersion: 1, passwordHash: hashPassword(password), createdAt: new Date().toISOString() };
+    users.push(user);
+    saveUsers();
+    json(response, 201, { user: publicUser(user) });
+  } catch (error) { json(response, 400, { error: error.message }); }
+}
+
+async function handleUserUpdate(request, response, userId) {
+  if (!hasRole(request, ['owner'])) {
+    json(response, 403, { error: '只有店主可以管理帳號' });
+    return;
+  }
+  try {
+    const values = JSON.parse((await readBody(request)).toString('utf8'));
+    const user = users.find((item) => item.id === userId);
+    if (!user) return json(response, 404, { error: '找不到帳號' });
+    if (typeof values.active === 'boolean') {
+      if (user.id === actorFor(request)?.id && !values.active) throw new Error('不能停用目前登入的帳號');
+      user.active = values.active;
+    }
+    if (values.password) {
+      if (String(values.password).length < 8) throw new Error('密碼至少需要 8 個字元');
+      user.passwordHash = hashPassword(String(values.password));
+      user.sessionVersion = (user.sessionVersion ?? 1) + 1;
+    }
+    if (values.role && ['owner', 'manager', 'staff'].includes(values.role)) {
+      if (user.id === actorFor(request)?.id && values.role !== user.role) throw new Error('不能變更目前登入帳號的角色');
+      user.role = values.role;
+    }
+    saveUsers();
+    json(response, 200, { user: publicUser(user) });
+  } catch (error) { json(response, 400, { error: error.message }); }
 }
 
 async function readBody(request, limit = 1_000_000) {
@@ -164,21 +315,16 @@ async function handleCreateBooking(request, response) {
 }
 
 function handleListBookings(request, response) {
-  const configuredKey = process.env.ADMIN_ACCESS_KEY;
-  if (!configuredKey) {
-    json(response, 503, { error: '後台尚未設定 ADMIN_ACCESS_KEY' });
-    return;
-  }
-  if (request.headers['x-admin-key'] !== configuredKey) {
-    json(response, 401, { error: '後台存取碼不正確' });
+  if (!hasRole(request, ['owner', 'manager', 'staff'])) {
+    json(response, 401, { error: '請先登入後台' });
     return;
   }
   json(response, 200, { bookings: bookingRequests.slice().reverse() });
 }
 
 async function handleCreateAdminBooking(request, response) {
-  if (!hasAdminAccess(request)) {
-    json(response, 401, { error: '後台存取碼不正確' });
+  if (!hasRole(request, ['owner', 'manager', 'staff'])) {
+    json(response, 403, { error: '沒有建立預約的權限' });
     return;
   }
   try {
@@ -210,8 +356,8 @@ async function handleCreateAdminBooking(request, response) {
 }
 
 async function handleMembers(request, response) {
-  if (!hasAdminAccess(request)) {
-    json(response, 401, { error: '後台存取碼不正確' });
+  if (!hasRole(request, ['owner', 'manager'])) {
+    json(response, 403, { error: '沒有會員管理權限' });
     return;
   }
   if (request.method === 'GET') {
@@ -234,14 +380,9 @@ async function handleMembers(request, response) {
   } catch (error) { json(response, 400, { error: error.message }); }
 }
 
-function hasAdminAccess(request) {
-  return Boolean(process.env.ADMIN_ACCESS_KEY)
-    && request.headers['x-admin-key'] === process.env.ADMIN_ACCESS_KEY;
-}
-
 async function handleUpdateBooking(request, response, bookingId) {
-  if (!hasAdminAccess(request)) {
-    json(response, 401, { error: '後台存取碼不正確' });
+  if (!hasRole(request, ['owner', 'manager', 'staff'])) {
+    json(response, 403, { error: '沒有更新預約的權限' });
     return;
   }
   try {
@@ -278,8 +419,8 @@ async function handleUpdateBooking(request, response, bookingId) {
 }
 
 async function handleSettings(request, response) {
-  if (!hasAdminAccess(request)) {
-    json(response, 401, { error: '後台存取碼不正確' });
+  if (!hasRole(request, ['owner', 'manager'])) {
+    json(response, 403, { error: '沒有修改營運設定的權限' });
     return;
   }
   if (request.method === 'GET') {
@@ -399,6 +540,19 @@ const server = createServer(async (request, response) => {
     });
     return;
   }
+  if (request.method === 'POST' && pathname === '/api/auth/login') {
+    await handleLogin(request, response);
+    return;
+  }
+  if (request.method === 'POST' && pathname === '/api/auth/logout') {
+    json(response, 200, { ok: true }, { 'Set-Cookie': sessionCookie(request, '', 0) });
+    return;
+  }
+  if (request.method === 'GET' && pathname === '/api/auth/me') {
+    const actor = actorFor(request);
+    json(response, actor ? 200 : 401, actor ? { user: publicUser(actor) } : { error: '尚未登入' });
+    return;
+  }
   if (request.method === 'POST' && pathname === '/api/auth/line') {
     await handleLineAuth(request, response);
     return;
@@ -426,6 +580,15 @@ const server = createServer(async (request, response) => {
   }
   if ((request.method === 'GET' || request.method === 'PUT') && pathname === '/api/admin/settings') {
     await handleSettings(request, response);
+    return;
+  }
+  if ((request.method === 'GET' || request.method === 'POST') && pathname === '/api/admin/users') {
+    await handleUsers(request, response);
+    return;
+  }
+  const userMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)$/);
+  if (request.method === 'PATCH' && userMatch) {
+    await handleUserUpdate(request, response, decodeURIComponent(userMatch[1]));
     return;
   }
   if (request.method === 'POST' && pathname === '/webhooks/line') {

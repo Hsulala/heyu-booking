@@ -8,13 +8,22 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="app-shell">
+    <section class="login-screen" id="login-screen" hidden>
+      <form class="login-panel" id="admin-login-form">
+        <p class="eyebrow">HEYU 店家後台</p><h1>登入禾域</h1><p>請使用店家為你建立的帳號。</p>
+        <label class="field"><span>帳號</span><input name="username" autocomplete="username" required /></label>
+        <label class="field"><span>密碼</span><input name="password" type="password" autocomplete="current-password" required /></label>
+        <p class="login-error" id="login-error" role="alert"></p>
+        <button class="submit-button" type="submit">登入</button>
+      </form>
+    </section>
+    <div class="app-shell" id="app-shell" hidden>
       <header class="topbar">
         <div>
           <p class="eyebrow">HEYU 店家後台</p>
           <p class="store-name">禾域</p>
         </div>
-        <button class="avatar" type="button" aria-label="開啟帳號選單" data-toast="目前登入身分：店長">闆</button>
+        <button class="avatar" id="account-button" type="button" aria-label="登出目前帳號" data-logout>闆</button>
       </header>
 
       <main id="main-content">
@@ -94,6 +103,7 @@
             <button type="button" data-setting="rewards"><span>點數、優惠券與堂數包</span><span>›</span></button>
             <button type="button" data-setting="reminders"><span>提醒與爽約規則</span><span>›</span></button>
             <button type="button" data-setting="branches"><span>分店管理</span><span>›</span></button>
+            <button type="button" id="user-management-button" data-users><span>帳號與權限</span><span>›</span></button>
             <button type="button" data-toast="雲端服務連線正常"><span>系統連線狀態</span><span>正常</span></button>
           </div>
           <p class="prototype-note">營運設定會同步保存至店家雲端空間。</p>
@@ -104,7 +114,7 @@
         <button class="is-active" type="button" data-nav="home"><span>⌂</span>首頁</button>
         <button type="button" data-nav="bookings"><span>▣</span>預約</button>
         <button class="create-button" type="button" data-open-create aria-label="新增預約"><span>＋</span>新增</button>
-        <button type="button" data-nav="members"><span>♙</span>會員</button>
+        <button type="button" id="members-nav" data-nav="members"><span>♙</span>會員</button>
         <button type="button" data-nav="more"><span>•••</span>更多</button>
         <div class="desktop-settings-nav" aria-label="營運設定">
           <button type="button" data-setting="services">療程與緩衝</button>
@@ -122,7 +132,7 @@
       <div class="sheet-handle"></div>
       <div class="sheet-header"><div><p class="eyebrow">快速操作</p><h2 id="create-title">新增</h2></div><button type="button" data-close-sheet aria-label="關閉">×</button></div>
       <button class="sheet-action primary-action" type="button" data-open-booking-form><span>＋</span><span><strong>新增預約</strong><small>建立單人或雙人預約</small></span></button>
-      <button class="sheet-action" type="button" data-open-member-form><span>♙</span><span><strong>新增會員</strong><small>先建立會員基本資料</small></span></button>
+      <button class="sheet-action" id="create-member-button" type="button" data-open-member-form><span>♙</span><span><strong>新增會員</strong><small>先建立會員基本資料</small></span></button>
       <button class="sheet-action" type="button" data-setting="hours"><span>休</span><span><strong>新增休假</strong><small>前往營業時間與休假設定</small></span></button>
     </section>
 
@@ -169,6 +179,21 @@
       <div class="sheet-handle"></div>
       <div class="sheet-header"><div><p class="eyebrow">營運設定</p><h2 id="setting-title">設定</h2></div><button type="button" data-close-sheet aria-label="關閉">×</button></div>
       <form id="setting-form"><div class="form-grid" id="setting-fields"></div><p class="form-help">設定會同步保存到店家後台；使用 Railway Volume 時重新部署後仍會保留。</p><button class="submit-button" type="submit">儲存設定</button></form>
+    </section>
+    <section class="bottom-sheet form-sheet" id="users-sheet" role="dialog" aria-modal="true" aria-labelledby="users-title" hidden>
+      <div class="sheet-handle"></div>
+      <div class="sheet-header"><div><p class="eyebrow">店主專用</p><h2 id="users-title">帳號與權限</h2></div><button type="button" data-close-sheet aria-label="關閉">×</button></div>
+      <div class="user-list" id="user-list"></div>
+      <form id="user-form">
+        <div class="form-grid">
+          <label class="field full"><span>顯示名稱</span><input name="displayName" maxlength="30" required placeholder="例如：小君" /></label>
+          <label class="field"><span>登入帳號</span><input name="username" pattern="[A-Za-z0-9._-]{3,40}" required placeholder="例如：xiaojun" /></label>
+          <label class="field"><span>角色</span><select name="role"><option value="staff">員工</option><option value="manager">店長</option><option value="owner">店主</option></select></label>
+          <label class="field full"><span>初始密碼</span><input name="password" type="password" minlength="8" required autocomplete="new-password" /></label>
+        </div>
+        <p class="form-help">員工可處理預約；店長可再管理會員與營運設定；店主可建立及停用帳號。</p>
+        <button class="submit-button" type="submit">建立帳號</button>
+      </form>
     </section>
     <div class="toast" role="status" aria-live="polite"></div>
     <script src="./app.js" defer></script>

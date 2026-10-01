@@ -3,8 +3,7 @@ const navButtons = [...document.querySelectorAll('[data-nav]')];
 const backdrop = document.querySelector('.backdrop');
 const sheets = [...document.querySelectorAll('.bottom-sheet')];
 const toast = document.querySelector('.toast');
-const adminKeyStorage = 'heyu-admin-key';
-let bookings = [], members = [], selectedBookingId = '', selectedDate = '', bookingFilter = 'all', toastTimer;
+let bookings = [], members = [], users = [], currentUser = null, selectedBookingId = '', selectedDate = '', bookingFilter = 'all', toastTimer;
 let therapistSkillMap = { 小君: [], Amy: [], Kelly: [] };
 const therapistNames = ['小君', 'Amy', 'Kelly'];
 const serviceNames = ['身體精油按摩 60 分', '深層舒壓 90 分', '筋膜刀 60 分'];
@@ -20,7 +19,19 @@ const settingDefinitions = {
 
 function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[c]); }
 function localDateString(date = new Date()) { return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
-function getAdminKey(ask = true) { let key = sessionStorage.getItem(adminKeyStorage); if (!key && ask) { key = window.prompt('請輸入店家後台存取碼') || ''; if (key) sessionStorage.setItem(adminKeyStorage, key); } return key; }
+function applyRoleVisibility() {
+  const canManage = ['owner', 'manager'].includes(currentUser?.role);
+  document.querySelectorAll('[data-setting]').forEach((element) => { element.hidden = !canManage; });
+  document.querySelector('#user-management-button').hidden = currentUser?.role !== 'owner';
+  document.querySelector('#create-member-button').hidden = !canManage;
+  document.querySelector('#members-nav').hidden = !canManage;
+  document.querySelector('.bottom-nav').style.gridTemplateColumns = canManage ? '' : 'repeat(4, 1fr)';
+  document.querySelector('#account-button').textContent = currentUser?.displayName?.slice(0, 1) || '帳';
+  document.querySelector('#account-button').title = `${currentUser?.displayName ?? ''}・點擊登出`;
+}
+
+function showLogin() { document.querySelector('#app-shell').hidden = true; document.querySelector('#login-screen').hidden = false; }
+function showApp() { document.querySelector('#login-screen').hidden = true; document.querySelector('#app-shell').hidden = false; applyRoleVisibility(); }
 function showToast(message) { toast.textContent = message; toast.classList.add('is-visible'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2600); }
 function openSheet(sheet) { sheets.forEach((item) => { item.hidden = item !== sheet; }); backdrop.hidden = false; sheet.hidden = false; document.body.style.overflow = 'hidden'; sheet.querySelector('input, select, button')?.focus(); }
 function closeSheets() { sheets.forEach((sheet) => { sheet.hidden = true; }); backdrop.hidden = true; document.body.style.overflow = ''; }
@@ -62,8 +73,8 @@ function renderDashboard() {
 }
 
 async function syncData(ask = true) {
-  const key = getAdminKey(ask); if (!key) return;
-  try { const headers = { 'X-Admin-Key': key }; const [br, mr, sr] = await Promise.all([fetch('/api/admin/bookings', { cache: 'no-store', headers }), fetch('/api/admin/members', { cache: 'no-store', headers }), fetch('/api/admin/settings', { cache: 'no-store', headers })]); const bd = await br.json(), md = await mr.json(), sd = await sr.json(); if (!br.ok) throw new Error(bd.error || '無法同步預約'); if (!mr.ok) throw new Error(md.error || '無法同步會員'); if (!sr.ok) throw new Error(sd.error || '無法同步設定'); bookings = bd.bookings; members = md.members; therapistSkillMap = { 小君: [], Amy: [], Kelly: [], ...(sd.settings.therapists?.teachers ?? {}) }; updateAdminTherapistOptions(); renderBookings(); renderMembers(); renderDashboard(); } catch (error) { if (/存取碼/.test(error.message)) sessionStorage.removeItem(adminKeyStorage); showToast(error.message); }
+  if (!currentUser) return;
+  try { const canManageMembers = ['owner', 'manager'].includes(currentUser.role); const [br, mr, or] = await Promise.all([fetch('/api/admin/bookings', { cache: 'no-store' }), canManageMembers ? fetch('/api/admin/members', { cache: 'no-store' }) : Promise.resolve(null), fetch('/api/booking-options', { cache: 'no-store' })]); const bd = await br.json(), md = mr ? await mr.json() : { members: [] }, od = await or.json(); if (br.status === 401 || mr?.status === 401) { currentUser = null; showLogin(); return; } if (!br.ok) throw new Error(bd.error || '無法同步預約'); if (mr && !mr.ok) throw new Error(md.error || '無法同步會員'); bookings = bd.bookings; members = md.members; therapistSkillMap = { 小君: [], Amy: [], Kelly: [], ...(od.therapists ?? {}) }; updateAdminTherapistOptions(); renderBookings(); renderMembers(); renderDashboard(); } catch (error) { showToast(error.message); }
 }
 
 function openBooking(id) {
@@ -72,13 +83,13 @@ function openBooking(id) {
 }
 
 async function updateBookingStatus(status) {
-  const key = getAdminKey(); if (!key || !selectedBookingId) return;
-  try { const response = await fetch(`/api/admin/bookings/${encodeURIComponent(selectedBookingId)}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key }, body: JSON.stringify({ status }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '更新預約失敗'); closeSheets(); await syncData(false); showToast(`${status === 'confirmed' ? '已確認' : '已拒絕'}預約${result.lineNotification ? '，並已通知客人' : ''}`); } catch (error) { showToast(error.message); }
+  if (!selectedBookingId) return;
+  try { const response = await fetch(`/api/admin/bookings/${encodeURIComponent(selectedBookingId)}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '更新預約失敗'); closeSheets(); await syncData(false); showToast(`${status === 'confirmed' ? '已確認' : '已拒絕'}預約${result.lineNotification ? '，並已通知客人' : ''}`); } catch (error) { showToast(error.message); }
 }
 
 async function openSetting(key) {
-  const definition = settingDefinitions[key], adminKey = getAdminKey(); if (!definition || !adminKey) return; let settings = {};
-  try { const response = await fetch('/api/admin/settings', { cache: 'no-store', headers: { 'X-Admin-Key': adminKey } }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '無法讀取設定'); settings = result.settings; } catch (error) { showToast(error.message); }
+  const definition = settingDefinitions[key]; if (!definition || !['owner', 'manager'].includes(currentUser?.role)) return; let settings = {};
+  try { const response = await fetch('/api/admin/settings', { cache: 'no-store' }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '無法讀取設定'); settings = result.settings; } catch (error) { showToast(error.message); }
   const saved = settings[key] ?? {}, form = document.querySelector('#setting-form'); form.dataset.setting = key; document.querySelector('#setting-title').textContent = definition.title;
   if (key === 'therapists') {
     therapistSkillMap = { 小君: [], Amy: [], Kelly: [], ...(saved.teachers ?? {}) };
@@ -101,7 +112,31 @@ function renderTherapistSkills(name) {
 }
 
 function setDefaultBookingDate() { const form = document.querySelector('#booking-form'); form.elements.date.value = localDateString(); form.elements.time.value = '10:00'; }
-document.querySelector('#today-label').textContent = new Intl.DateTimeFormat('zh-TW', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date()); buildDateStrip(); setDefaultBookingDate(); syncData(true);
+document.querySelector('#today-label').textContent = new Intl.DateTimeFormat('zh-TW', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date()); buildDateStrip(); setDefaultBookingDate();
+
+async function bootstrapAuth() {
+  try {
+    const response = await fetch('/api/auth/me', { cache: 'no-store' });
+    if (!response.ok) return showLogin();
+    currentUser = (await response.json()).user;
+    showApp();
+    await syncData(false);
+  } catch { showLogin(); }
+}
+
+async function openUsers() {
+  if (currentUser?.role !== 'owner') return;
+  try {
+    const response = await fetch('/api/admin/users', { cache: 'no-store' });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '無法讀取帳號');
+    users = result.users;
+    document.querySelector('#user-list').innerHTML = users.map((user) => `<div class="user-row"><span><strong>${escapeHtml(user.displayName)}</strong><small>${escapeHtml(user.username)}・${user.role === 'owner' ? '店主' : user.role === 'manager' ? '店長' : '員工'}・${user.active ? '使用中' : '已停用'}</small></span>${user.id === currentUser.id ? '<small>目前帳號</small>' : `<span class="user-actions"><button type="button" data-user-password="${escapeHtml(user.id)}">重設密碼</button><button type="button" data-user-toggle="${escapeHtml(user.id)}" data-active="${user.active}">${user.active ? '停用' : '啟用'}</button></span>`}</div>`).join('');
+    openSheet(document.querySelector('#users-sheet'));
+  } catch (error) { showToast(error.message); }
+}
+
+bootstrapAuth();
 
 document.addEventListener('click', (event) => {
   const target = event.target.closest('button'); if (!target) return;
@@ -109,6 +144,10 @@ document.addEventListener('click', (event) => {
   if (target.dataset.date) { selectedDate = target.dataset.date; buildDateStrip(); renderBookings(); }
   if (target.classList.contains('chip')) { document.querySelectorAll('.chip').forEach((item) => item.classList.remove('is-selected')); target.classList.add('is-selected'); bookingFilter = target.textContent.includes('待確認') ? 'pending' : target.textContent.includes('已確認') ? 'confirmed' : 'all'; renderBookings(); }
   if (target.hasAttribute('data-open-create')) openSheet(document.querySelector('#create-sheet')); if (target.hasAttribute('data-open-booking-form')) openSheet(document.querySelector('#booking-form-sheet')); if (target.hasAttribute('data-open-member-form')) openSheet(document.querySelector('#member-form-sheet')); if (target.hasAttribute('data-close-sheet')) closeSheets(); if (target.dataset.serverBooking) openBooking(target.dataset.serverBooking); if (target.dataset.bookingStatus) updateBookingStatus(target.dataset.bookingStatus); if (target.dataset.setting) { showScreen('more'); openSetting(target.dataset.setting); } if (target.dataset.toast) showToast(target.dataset.toast);
+  if (target.hasAttribute('data-users')) openUsers();
+  if (target.dataset.userToggle) updateUser(target.dataset.userToggle, { active: target.dataset.active !== 'true' });
+  if (target.dataset.userPassword) resetUserPassword(target.dataset.userPassword);
+  if (target.hasAttribute('data-logout')) logout();
 });
 
 document.querySelector('#setting-fields').addEventListener('change', (event) => {
@@ -126,6 +165,13 @@ document.querySelector('#booking-date-jump').addEventListener('change', (event) 
 document.querySelector('#booking-form').elements.service.addEventListener('change', updateAdminTherapistOptions);
 document.querySelector('#member-search').addEventListener('input', (event) => { const query = event.currentTarget.value.trim().toLowerCase(); let visible = 0; document.querySelectorAll('.member-card').forEach((member) => { const match = member.dataset.name.toLowerCase().includes(query); member.hidden = !match; if (match) visible += 1; }); document.querySelector('#member-empty').hidden = visible !== 0; });
 
-document.querySelector('#booking-form').addEventListener('submit', async (event) => { event.preventDefault(); const key = getAdminKey(); if (!key) return; try { const response = await fetch('/api/admin/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key }, body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '建立預約失敗'); event.currentTarget.reset(); setDefaultBookingDate(); closeSheets(); await syncData(false); showScreen('bookings'); showToast('預約已建立並同步'); } catch (error) { showToast(error.message); } });
-document.querySelector('#member-form').addEventListener('submit', async (event) => { event.preventDefault(); const key = getAdminKey(); if (!key) return; try { const response = await fetch('/api/admin/members', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key }, body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '建立會員失敗'); event.currentTarget.reset(); closeSheets(); await syncData(false); showScreen('members'); showToast('會員已建立並同步'); } catch (error) { showToast(error.message); } });
-document.querySelector('#setting-form').addEventListener('submit', async (event) => { event.preventDefault(); const key = getAdminKey(), settingKey = event.currentTarget.dataset.setting; if (!key) return; if (settingKey === 'therapists') captureTherapistSkills(); const values = settingKey === 'therapists' ? { teachers: therapistSkillMap } : Object.fromEntries(new FormData(event.currentTarget)); try { const response = await fetch('/api/admin/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key }, body: JSON.stringify({ key: settingKey, values }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '設定儲存失敗'); closeSheets(); showToast(`${settingDefinitions[settingKey].title}已同步`); } catch (error) { showToast(error.message); } });
+document.querySelector('#booking-form').addEventListener('submit', async (event) => { event.preventDefault(); try { const response = await fetch('/api/admin/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '建立預約失敗'); event.currentTarget.reset(); setDefaultBookingDate(); closeSheets(); await syncData(false); showScreen('bookings'); showToast('預約已建立並同步'); } catch (error) { showToast(error.message); } });
+document.querySelector('#member-form').addEventListener('submit', async (event) => { event.preventDefault(); try { const response = await fetch('/api/admin/members', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '建立會員失敗'); event.currentTarget.reset(); closeSheets(); await syncData(false); showScreen('members'); showToast('會員已建立並同步'); } catch (error) { showToast(error.message); } });
+document.querySelector('#setting-form').addEventListener('submit', async (event) => { event.preventDefault(); const settingKey = event.currentTarget.dataset.setting; if (settingKey === 'therapists') captureTherapistSkills(); const values = settingKey === 'therapists' ? { teachers: therapistSkillMap } : Object.fromEntries(new FormData(event.currentTarget)); try { const response = await fetch('/api/admin/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: settingKey, values }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '設定儲存失敗'); closeSheets(); showToast(`${settingDefinitions[settingKey].title}已同步`); } catch (error) { showToast(error.message); } });
+
+document.querySelector('#admin-login-form').addEventListener('submit', async (event) => { event.preventDefault(); const errorBox = document.querySelector('#login-error'); errorBox.textContent = ''; try { const response = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '登入失敗'); currentUser = result.user; event.currentTarget.reset(); showApp(); await syncData(false); } catch (error) { errorBox.textContent = error.message; } });
+document.querySelector('#user-form').addEventListener('submit', async (event) => { event.preventDefault(); try { const response = await fetch('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '建立帳號失敗'); event.currentTarget.reset(); await openUsers(); showToast('帳號已建立'); } catch (error) { showToast(error.message); } });
+
+async function updateUser(userId, values) { try { const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '更新帳號失敗'); await openUsers(); showToast('帳號狀態已更新'); } catch (error) { showToast(error.message); } }
+async function resetUserPassword(userId) { const password = window.prompt('請輸入至少 8 個字元的新密碼'); if (!password) return; await updateUser(userId, { password }); }
+async function logout() { await fetch('/api/auth/logout', { method: 'POST' }); currentUser = null; closeSheets(); showLogin(); }

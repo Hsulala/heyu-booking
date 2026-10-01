@@ -17,10 +17,16 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { background: #e4d7c9; }
 body { margin: 0; color: var(--ink); background: var(--bg); }
 button, input, select { font: inherit; }
 button { color: inherit; }
+.login-screen { display: grid; min-height: 100dvh; place-items: center; padding: 24px; background: var(--bg); }
+.login-panel { width: min(100%, 420px); padding: 30px; border: 1px solid var(--line); border-radius: 24px; background: var(--surface); box-shadow: var(--shadow); }
+.login-panel > p:not(.eyebrow) { color: var(--muted); }
+.login-panel .field { margin-bottom: 14px; }
+.login-error { min-height: 20px; margin: 5px 0 10px; color: var(--alert); font-size: 13px; }
 
 .app-shell { width: 100%; min-height: 100dvh; background: var(--bg); }
 .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; padding: max(16px, env(safe-area-inset-top)) 20px 12px; background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(227, 224, 216, .7); }
@@ -154,6 +160,11 @@ h2 { margin-bottom: 0; font-size: 21px; letter-spacing: -.02em; }
 .member-card.local-entry { border-color: var(--sand); }
 .toast { position: fixed; z-index: 60; right: 20px; bottom: 100px; left: 20px; padding: 13px 16px; color: white; border-radius: 14px; background: var(--brand-dark); text-align: center; opacity: 0; transform: translateY(10px); pointer-events: none; transition: .2s ease; }
 .toast.is-visible { opacity: 1; transform: none; }
+.user-list { display: grid; gap: 8px; margin-bottom: 22px; }
+.user-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 13px; border: 1px solid var(--line); border-radius: 14px; }
+.user-row small { display: block; margin-top: 3px; color: var(--muted); }
+.user-row button { padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; background: transparent; font-size: 12px; }
+.user-actions { display: flex; gap: 6px; }
 
 /* Desktop administration layout: persistent sidebar, wider work area and centered dialogs. */
 @media (min-width: 900px) {

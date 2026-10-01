@@ -90,7 +90,8 @@ test('customer booking entry initializes LIFF and delegates identity verificatio
 test('admin loads protected LINE booking requests from the backend', async () => {
   const [html, js] = await Promise.all([readFile(files.html, 'utf8'), readFile(files.js, 'utf8')]);
   assert.match(js, /\/api\/admin\/bookings/);
-  assert.match(js, /X-Admin-Key/);
+  assert.match(js, /\/api\/auth\/me/);
+  assert.match(js, /\/api\/auth\/login/);
   assert.match(js, /待確認/);
   assert.match(js, /\/status/);
   assert.match(html, /data-booking-status="confirmed"/);
@@ -116,8 +117,25 @@ test('server persists bookings, members and operating settings to the configured
   assert.match(server, /saveBookingRequests/);
   assert.match(server, /saveMembers/);
   assert.match(server, /saveOperatingSettings/);
+  assert.match(server, /saveUsers/);
   assert.match(server, /therapistCanServe/);
   assert.match(server, /\/api\/booking-options/);
+});
+
+test('admin supports individual accounts, secure sessions and role-based controls', async () => {
+  const [html, js, server] = await Promise.all([
+    readFile(files.html, 'utf8'),
+    readFile(files.js, 'utf8'),
+    readFile(new URL('../server.mjs', import.meta.url), 'utf8'),
+  ]);
+  assert.match(html, /id="admin-login-form"/);
+  assert.match(html, /id="user-form"/);
+  assert.match(html, /店主|店長|員工/);
+  assert.match(js, /applyRoleVisibility/);
+  assert.match(js, /\/api\/admin\/users/);
+  assert.match(server, /hashPassword/);
+  assert.match(server, /HttpOnly; SameSite=Strict/);
+  assert.match(server, /hasRole/);
 });
 
 test('customer and admin content uses production-facing language', async () => {
