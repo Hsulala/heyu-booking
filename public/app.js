@@ -26,8 +26,7 @@ function applyRoleVisibility() {
   document.querySelector('#create-member-button').hidden = !canManage;
   document.querySelector('#members-nav').hidden = !canManage;
   document.querySelector('.bottom-nav').style.gridTemplateColumns = canManage ? '' : 'repeat(4, 1fr)';
-  document.querySelector('#account-button').textContent = currentUser?.displayName?.slice(0, 1) || '帳';
-  document.querySelector('#account-button').title = `${currentUser?.displayName ?? ''}・點擊登出`;
+  document.querySelector('#account-name').textContent = `${currentUser?.displayName ?? ''}・${currentUser?.role === 'owner' ? '店主' : currentUser?.role === 'manager' ? '店長' : '員工'}`;
 }
 
 function showLogin() { document.querySelector('#app-shell').hidden = true; document.querySelector('#login-screen').hidden = false; }
