@@ -38,12 +38,14 @@ test('prototype assets also work when index.html is opened directly', async () =
   assert.doesNotMatch(html, /type="module"/);
 });
 
-test('in-app and tablet previews keep the mobile navigation flush to the bottom', async () => {
+test('admin has dedicated mobile navigation and desktop sidebar layouts', async () => {
   const [html, css] = await Promise.all([readFile(files.html, 'utf8'), readFile(files.css, 'utf8')]);
   assert.match(html, /<p class="store-name">禾域<\/p>/);
   assert.doesNotMatch(html, /切換分店/);
-  assert.match(css, /@media \(min-width: 1100px\)/);
-  assert.doesNotMatch(css, /@media \(min-width: 720px\)/);
+  assert.match(css, /@media \(min-width: 900px\)/);
+  assert.match(css, /padding-left: 240px/);
+  assert.match(css, /width: 240px/);
+  assert.doesNotMatch(css, /max-width: 430px/);
 });
 
 test('brand palette uses milk-tea and coffee colors', async () => {
@@ -66,8 +68,9 @@ test('owner test build can create local bookings and members without implying pr
 });
 
 test('customer booking entry initializes LIFF and delegates identity verification to the backend', async () => {
-  const [html, js] = await Promise.all([
+  const [html, css, js] = await Promise.all([
     readFile(new URL('../public/booking.html', import.meta.url), 'utf8'),
+    readFile(new URL('../public/booking.css', import.meta.url), 'utf8'),
     readFile(new URL('../public/booking.js', import.meta.url), 'utf8'),
   ]);
   assert.match(html, /static\.line-scdn\.net\/liff\/edge\/2\/sdk\.js/);
@@ -76,4 +79,7 @@ test('customer booking entry initializes LIFF and delegates identity verificatio
   assert.match(js, /liff\.getIDToken/);
   assert.match(js, /\/api\/auth\/line/);
   assert.doesNotMatch(js, /LINE_.*SECRET|CHANNEL_ACCESS_TOKEN/);
+  assert.match(html, /class="form-grid schedule-grid"/);
+  assert.match(css, /@media \(max-width: 430px\)/);
+  assert.match(css, /\.schedule-grid \{ grid-template-columns: 1fr; \}/);
 });

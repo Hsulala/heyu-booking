@@ -34,11 +34,12 @@ form { display: grid; gap: 14px; }
 .section-title { display: flex; gap: 9px; align-items: center; margin-bottom: 17px; }
 .section-title > span { display: grid; place-items: center; width: 26px; height: 26px; color: white; border-radius: 50%; background: var(--brand); font-size: 12px; font-weight: 800; }
 h2 { margin: 0; font-size: 19px; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+.form-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 13px; }
 label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 750; }
 label.full { grid-column: 1 / -1; }
-input, select, textarea { width: 100%; min-width: 0; padding: 0 13px; color: var(--ink); border: 1px solid var(--line); border-radius: 13px; outline: none; background: white; }
+input, select, textarea { width: 100%; min-width: 0; max-width: 100%; padding: 0 13px; color: var(--ink); border: 1px solid var(--line); border-radius: 13px; outline: none; background: white; }
 input, select { height: 48px; }
+input[type="date"], input[type="time"] { display: block; min-width: 0; width: 100%; appearance: none; -webkit-appearance: none; }
 textarea { padding-block: 12px; resize: vertical; }
 input:focus, select:focus, textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
 .privacy-note { margin: 3px 5px; color: var(--muted); font-size: 12px; line-height: 1.6; }
@@ -47,4 +48,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--brand); box-shad
 .success-mark { display: grid; place-items: center; width: 62px; height: 62px; margin: 0 auto 18px; color: white; border-radius: 50%; background: var(--brand); font-size: 29px; }
 .success-card p { color: var(--muted); line-height: 1.6; }
 .success-card button { margin-top: 8px; color: var(--brand-dark); background: var(--brand-soft); }
+@media (max-width: 430px) {
+  .schedule-grid { grid-template-columns: 1fr; }
+}
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
