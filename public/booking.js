@@ -7,6 +7,32 @@ const successSummary = document.querySelector('#success-summary');
 const submitButton = form.querySelector('.submit-button');
 let lineIdToken = '';
 
+function setSelectOptions(select, values, emptyOption = null) {
+  const options = [];
+  if (emptyOption) options.push(new Option(emptyOption.label, emptyOption.value));
+  values.forEach((value) => options.push(new Option(value, value)));
+  select.replaceChildren(...options);
+}
+
+async function loadBookingOptions() {
+  const response = await fetch('/api/booking-options', { cache: 'no-store' });
+  if (!response.ok) return;
+  const options = await response.json();
+  const serviceSelect = form.elements.service;
+  const therapistSelect = form.elements.therapist;
+  if (options.services?.length) setSelectOptions(serviceSelect, options.services);
+  const refreshTherapists = () => {
+    const entries = Object.entries(options.therapists ?? {});
+    const hasAssignments = entries.some(([, skills]) => skills.length);
+    const available = entries.filter(([, skills]) => !hasAssignments || skills.includes(serviceSelect.value)).map(([name]) => name);
+    const fallback = entries.length ? entries.map(([name]) => name) : ['小君', 'Amy', 'Kelly'];
+    const names = hasAssignments ? available : fallback;
+    setSelectOptions(therapistSelect, names, { label: '不指定', value: '' });
+  };
+  serviceSelect.addEventListener('change', refreshTherapists);
+  refreshTherapists();
+}
+
 function setDefaultDate() {
   const now = new Date();
   const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
@@ -64,7 +90,7 @@ async function initializeLine() {
 }
 
 setDefaultDate();
-window.addEventListener('load', initializeLine);
+window.addEventListener('load', () => Promise.all([initializeLine(), loadBookingOptions()]));
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();

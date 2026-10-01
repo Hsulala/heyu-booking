@@ -32,19 +32,19 @@ LINE LIFF 預約、店家後台與會員制度的單體應用專案。
 - Railway 上使用一個應用服務和一個獨立 PostgreSQL，兩者透過私有網路連線。
 - 第一版不加入 Redis，以降低成本與維運複雜度。
 
-## 明日測試版範圍
+## 店家正式介面與交件前測試
 
-目前部署目標是讓店家先驗證操作流程，不是正式營運版：
+目前介面已使用正式營運文案，交件前可直接用真實流程驗收：
 
 - 可瀏覽首頁、預約、會員與設定頁。
-- 可建立單人／雙人測試預約，並選擇老師或保留待指派。
-- 可建立與搜尋測試會員。
+- 可建立單人／雙人預約，並依療程選擇具備能力的老師或保留待指派。
+- 可建立、同步與搜尋會員。
 - 從 LIFF 送出的預約需求會出現在後台，並嘗試以 LINE 傳送收件通知。
-- LIFF 預約目前暫存在 Railway 執行中的記憶體，服務重啟或重新部署後會清空。
-- 後台手動新增的資料只保存在當下裝置的瀏覽器，可從「更多」重設。
-- 尚未接上正式 PostgreSQL、付款、完整角色權限及時段防撞；畫面有清楚標示「測試版」。
+- LINE 預約、店家手動預約、會員與營運設定皆透過後台 API 雲端同步。
+- 使用 Railway Volume 與 `DATA_FILE` 後，服務重啟及重新部署仍會保留資料。
+- 後台資料 API 由 `ADMIN_ACCESS_KEY` 保護。
 
-這個界線能讓老闆先確認欄位、文案與操作順序，避免測試資料被誤認為正式會員資料。
+交件前仍應由店家完成真實裝置驗收，確認營業規則、療程、老師能力與通知文案。
 
 ## LINE 整合
 
@@ -66,9 +66,9 @@ ADMIN_ACCESS_KEY
 DATA_FILE
 ```
 
-`ADMIN_ACCESS_KEY` 請自行設定一組不容易猜到的存取碼，店家進入預約頁時用它讀取真實測試預約。
+`ADMIN_ACCESS_KEY` 請自行設定一組不容易猜到的存取碼，店家進入後台時用它讀取雲端資料。
 
-若要讓測試預約在重新啟動後仍保留，請在 Railway 加入 Volume、掛載到 `/data`，並設定 `DATA_FILE=/data/bookings.json`。未設定時資料只暫存在執行中的伺服器記憶體。
+若要讓資料在重新啟動後仍保留，請在 Railway 加入 Volume、掛載到 `/data`，並設定 `DATA_FILE=/data/bookings.json`。未設定時資料只暫存在執行中的伺服器記憶體。
 
 LINE Developers Console 的 LIFF Endpoint URL 使用 `/booking`。Messaging API 頁籤的 Webhook URL 請設定為：
 
@@ -82,7 +82,7 @@ https://heyu-booking-production-bcf9.up.railway.app/webhooks/line
 
 - `massage_booking_schema_v0.2.sql`：原始審查稿，保留作為歷史資料。
 - `db/schema_v0.3.sql`：依已確認需求重整的開發基準。
-- `public/`：以店家手機操作為優先的互動後台原型。
+- `public/`：店家管理後台與 LINE 客戶預約介面。
 - `server.mjs`：本機及 Railway 可使用的靜態網站服務，含 `/healthz` 健康檢查。
 - `railway.toml`：Railway 建置、啟動及健康檢查設定。
 
@@ -94,10 +94,10 @@ npm test
 
 測試同時包含靜態結構守門檢查，以及透過 PGlite（PostgreSQL WASM）實際建表與防撞測試。部署前仍會再於 Railway 的 PostgreSQL 17 執行一次正式 migration 驗收。
 
-## 查看手機版後台原型
+## 查看店家後台
 
 ```bash
 npm run dev
 ```
 
-接著開啟 `http://localhost:3000`。目前畫面使用虛構示範資料，主要用來確認手機操作流程；尚未連接正式會員與預約資料。
+接著開啟 `http://localhost:3000`。後台需要設定 `ADMIN_ACCESS_KEY`，資料持久化則需設定 `DATA_FILE`。

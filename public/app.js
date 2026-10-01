@@ -3,355 +3,129 @@ const navButtons = [...document.querySelectorAll('[data-nav]')];
 const backdrop = document.querySelector('.backdrop');
 const sheets = [...document.querySelectorAll('.bottom-sheet')];
 const toast = document.querySelector('.toast');
-const storageKey = 'heyu-booking-demo-v1';
 const adminKeyStorage = 'heyu-admin-key';
-const settingsStorage = 'heyu-settings-v1';
-let serverBookings = [];
-let selectedServerBookingId = '';
+let bookings = [], members = [], selectedBookingId = '', selectedDate = '', bookingFilter = 'all', toastTimer;
+let therapistSkillMap = { 小君: [], Amy: [], Kelly: [] };
+const therapistNames = ['小君', 'Amy', 'Kelly'];
+const serviceNames = ['身體精油按摩 60 分', '深層舒壓 90 分', '筋膜刀 60 分'];
 
 const settingDefinitions = {
   services: { title: '療程與緩衝時間', fields: [['serviceName', '療程名稱', '身體精油按摩'], ['duration', '服務分鐘', '60'], ['buffer', '緩衝分鐘', '30']] },
-  therapists: { title: '老師與可服務項目', fields: [['therapistNames', '老師名單', '小君、Amy、Kelly'], ['skills', '可服務療程', '精油按摩、深層舒壓、筋膜刀']] },
+  therapists: { title: '老師與可服務項目', fields: [] },
   hours: { title: '營業時間與休假', fields: [['openTime', '開始營業', '10:00'], ['closeTime', '結束營業', '21:00'], ['closedDays', '固定休假', '依店內公告']] },
   rewards: { title: '點數、優惠券與堂數包', fields: [['pointsRate', '每 NT$100 回饋點數', '1'], ['coupon', '目前優惠', '新客體驗優惠'], ['packages', '堂數包', '精油按摩 10 堂']] },
   reminders: { title: '提醒與爽約規則', fields: [['reminderHours', '提前提醒小時', '24'], ['cancelHours', '可取消期限（小時）', '12'], ['noShowRule', '爽約規則', '請與店家聯絡']] },
   branches: { title: '分店管理', fields: [['branchName', '分店名稱', '禾域本店'], ['address', '地址', '請填寫地址'], ['phone', '分店電話', '請填寫電話']] },
 };
 
-function loadDemoState() {
-  try {
-    return JSON.parse(localStorage.getItem(storageKey)) ?? { bookings: [], members: [] };
-  } catch {
-    return { bookings: [], members: [] };
-  }
+function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[c]); }
+function localDateString(date = new Date()) { return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+function getAdminKey(ask = true) { let key = sessionStorage.getItem(adminKeyStorage); if (!key && ask) { key = window.prompt('請輸入店家後台存取碼') || ''; if (key) sessionStorage.setItem(adminKeyStorage, key); } return key; }
+function showToast(message) { toast.textContent = message; toast.classList.add('is-visible'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2600); }
+function openSheet(sheet) { sheets.forEach((item) => { item.hidden = item !== sheet; }); backdrop.hidden = false; sheet.hidden = false; document.body.style.overflow = 'hidden'; sheet.querySelector('input, select, button')?.focus(); }
+function closeSheets() { sheets.forEach((sheet) => { sheet.hidden = true; }); backdrop.hidden = true; document.body.style.overflow = ''; }
+function showScreen(name) { screens.forEach((screen) => screen.classList.toggle('is-active', screen.dataset.screen === name)); navButtons.forEach((button) => button.classList.toggle('is-active', button.dataset.nav === name)); if (['home', 'bookings', 'members'].includes(name)) syncData(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function statusText(status) { return status === 'confirmed' ? '已確認' : status === 'rejected' ? '已拒絕' : '待確認'; }
+function updateAdminTherapistOptions() {
+  const form = document.querySelector('#booking-form'), service = form.elements.service.value, select = form.elements.therapist, previous = select.value;
+  const hasAssignments = Object.values(therapistSkillMap).some((skills) => skills.length);
+  const available = therapistNames.filter((name) => !hasAssignments || (therapistSkillMap[name] ?? []).includes(service));
+  select.innerHTML = `<option value="">稍後指派</option>${available.map((name) => `<option>${name}</option>`).join('')}`;
+  if (available.includes(previous)) select.value = previous;
 }
 
-const demoState = loadDemoState();
-
-function saveDemoState() {
-  localStorage.setItem(storageKey, JSON.stringify(demoState));
+function buildDateStrip() {
+  const today = new Date(); selectedDate ||= localDateString(today);
+  document.querySelector('#date-strip').innerHTML = Array.from({ length: 5 }, (_, i) => { const date = new Date(today); date.setDate(today.getDate() + i); const value = localDateString(date); const weekday = i === 0 ? '今天' : new Intl.DateTimeFormat('zh-TW', { weekday: 'short' }).format(date); return `<button class="${value === selectedDate ? 'is-selected' : ''}" type="button" data-date="${value}"><span>${weekday}</span><strong>${date.getDate()}</strong></button>`; }).join('');
+  document.querySelector('#booking-date-jump').value = selectedDate;
 }
 
-function escapeHtml(value) {
-  return String(value).replace(/[&<>'"]/g, (character) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
-  })[character]);
+function renderBookings() {
+  const visible = bookings.filter((b) => b.date === selectedDate).filter((b) => bookingFilter === 'all' || b.status === bookingFilter).sort((a, b) => a.time.localeCompare(b.time));
+  document.querySelector('#booking-timeline').innerHTML = visible.length ? visible.map((b) => `<article class="booking-row remote-entry${b.status === 'pending' ? ' attention' : ''}"><time>${escapeHtml(b.time)}</time><span class="line-dot"></span><button class="booking-card" type="button" data-server-booking="${escapeHtml(b.id)}"><span class="booking-top"><strong>${escapeHtml(b.customer)}</strong><span class="status ${b.status === 'confirmed' ? 'status-ready' : b.status === 'pending' ? 'status-alert' : ''}">${statusText(b.status)}</span></span><small>${b.partySize === '2' ? '雙人' : '單人'}・${escapeHtml(b.service)}</small><span class="therapist">${escapeHtml(b.therapist ? `老師：${b.therapist}` : '老師：尚未指派')}</span></button></article>`).join('') : '<p class="empty-state">這一天尚無預約</p>';
 }
 
-function showScreen(name) {
-  screens.forEach((screen) => screen.classList.toggle('is-active', screen.dataset.screen === name));
-  navButtons.forEach((button) => button.classList.toggle('is-active', button.dataset.nav === name));
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  if (name === 'bookings') loadServerBookings();
+function renderMembers() {
+  document.querySelector('#member-list').innerHTML = members.map((m) => `<button class="member-card card" type="button" data-name="${escapeHtml(`${m.name} ${m.phone}`)}" data-toast="${escapeHtml(m.note || `${m.name}・${m.phone || '未填手機'}`)}"><span class="member-avatar">${escapeHtml(m.name.slice(0, 1))}</span><span><strong>${escapeHtml(m.name)}</strong><small>${escapeHtml(m.phone || '未填手機')}</small><em>雲端會員</em></span><span class="chevron">›</span></button>`).join('');
+  document.querySelector('#member-empty').hidden = members.length !== 0;
 }
 
-function openSheet(sheet) {
-  sheets.forEach((item) => { item.hidden = item !== sheet; });
-  backdrop.hidden = false;
-  sheet.hidden = false;
-  document.body.style.overflow = 'hidden';
-  sheet.querySelector('input, select, button')?.focus();
+function renderDashboard() {
+  const today = localDateString(), todayBookings = bookings.filter((b) => b.date === today && b.status !== 'rejected'), pending = bookings.filter((b) => b.status === 'pending');
+  const guests = todayBookings.reduce((sum, b) => sum + Number(b.partySize || 1), 0);
+  document.querySelector('#home-summary').textContent = todayBookings.length ? `今天有 ${todayBookings.length} 組客人。` : '今天尚無預約。';
+  document.querySelector('#today-booking-count').textContent = todayBookings.length; document.querySelector('#today-guest-count').textContent = `${guests} 位客人`; document.querySelector('#today-pending-count').textContent = pending.length; document.querySelector('#pending-count').textContent = pending.length;
+  document.querySelector('#pending-chip').textContent = `待確認 ${pending.length}`;
+  const now = new Date().toTimeString().slice(0, 5), next = todayBookings.filter((b) => b.time >= now).sort((a, b) => a.time.localeCompare(b.time))[0];
+  document.querySelector('#next-booking-title').textContent = next ? `${next.time}・${next.customer}` : '今日尚無後續預約'; document.querySelector('#next-booking-status').textContent = next ? statusText(next.status) : '行程'; document.querySelector('#next-booking-summary').textContent = next ? `${next.partySize === '2' ? '雙人' : '單人'}・${next.service}・${next.therapist || '尚未指派老師'}` : '新增預約後會顯示在這裡。';
+  document.querySelector('#task-list').innerHTML = pending.length ? pending.slice(0, 3).map((b) => `<button class="task-card" type="button" data-server-booking="${escapeHtml(b.id)}"><span class="task-icon urgent">!</span><span><strong>${escapeHtml(b.customer)}等待確認</strong><small>${escapeHtml(b.date)} ${escapeHtml(b.time)}・${escapeHtml(b.service)}</small></span><span class="chevron">›</span></button>`).join('') : '<p class="empty-state">目前沒有待處理預約</p>';
 }
 
-function closeSheets() {
-  sheets.forEach((sheet) => { sheet.hidden = true; });
-  backdrop.hidden = true;
-  document.body.style.overflow = '';
+async function syncData(ask = true) {
+  const key = getAdminKey(ask); if (!key) return;
+  try { const headers = { 'X-Admin-Key': key }; const [br, mr, sr] = await Promise.all([fetch('/api/admin/bookings', { cache: 'no-store', headers }), fetch('/api/admin/members', { cache: 'no-store', headers }), fetch('/api/admin/settings', { cache: 'no-store', headers })]); const bd = await br.json(), md = await mr.json(), sd = await sr.json(); if (!br.ok) throw new Error(bd.error || '無法同步預約'); if (!mr.ok) throw new Error(md.error || '無法同步會員'); if (!sr.ok) throw new Error(sd.error || '無法同步設定'); bookings = bd.bookings; members = md.members; therapistSkillMap = { 小君: [], Amy: [], Kelly: [], ...(sd.settings.therapists?.teachers ?? {}) }; updateAdminTherapistOptions(); renderBookings(); renderMembers(); renderDashboard(); } catch (error) { if (/存取碼/.test(error.message)) sessionStorage.removeItem(adminKeyStorage); showToast(error.message); }
 }
 
-let toastTimer;
-function showToast(message) {
-  toast.textContent = message;
-  toast.classList.add('is-visible');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
+function openBooking(id) {
+  const b = bookings.find((item) => item.id === id); if (!b) return; selectedBookingId = id;
+  document.querySelector('#detail-title').textContent = `${b.customer}・${b.time}`; document.querySelector('.detail-list').innerHTML = `<div><dt>日期</dt><dd>${escapeHtml(b.date)}</dd></div><div><dt>人數</dt><dd>${b.partySize === '2' ? '雙人' : '單人'}</dd></div><div><dt>療程</dt><dd>${escapeHtml(b.service)}</dd></div><div><dt>老師</dt><dd>${escapeHtml(b.therapist || '尚未指派')}</dd></div><div><dt>手機</dt><dd>${escapeHtml(b.phone || '未填')}</dd></div><div><dt>備註</dt><dd>${escapeHtml(b.note || '無')}</dd></div>`; document.querySelector('#detail-actions').hidden = b.status !== 'pending'; openSheet(document.querySelector('#detail-sheet'));
 }
 
-function renderSavedBookings() {
-  document.querySelectorAll('.booking-row.local-entry').forEach((element) => element.remove());
-  const timeline = document.querySelector('#booking-timeline');
-  demoState.bookings
-    .slice()
-    .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
-    .forEach((booking) => {
-      const row = document.createElement('article');
-      row.className = `booking-row local-entry${booking.therapist ? '' : ' attention'}`;
-      const party = booking.partySize === '2' ? '雙人' : '單人';
-      const teacher = booking.therapist ? `老師：${escapeHtml(booking.therapist)}` : '尚未指派老師';
-      row.innerHTML = `
-        <time>${escapeHtml(booking.time)}</time><span class="line-dot"></span>
-        <button class="booking-card" type="button" data-demo-booking="${escapeHtml(booking.id)}">
-          <span class="booking-top"><strong>${escapeHtml(booking.customer)}</strong><span class="status ${booking.therapist ? 'status-ready' : 'status-alert'}">${booking.therapist ? '已確認' : '待指派'}</span></span>
-          <small>${party}・${escapeHtml(booking.service)}・${escapeHtml(booking.date)}</small><span class="therapist">${teacher}</span>
-        </button>`;
-      timeline.append(row);
-    });
-}
-
-function renderServerBookings(bookings) {
-  serverBookings = bookings;
-  document.querySelectorAll('.booking-row.remote-entry').forEach((element) => element.remove());
-  const timeline = document.querySelector('#booking-timeline');
-  bookings
-    .slice()
-    .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
-    .forEach((booking) => {
-      const row = document.createElement('article');
-      row.className = `booking-row remote-entry${booking.status === 'pending' ? ' attention' : ''}`;
-      const party = booking.partySize === '2' ? '雙人' : '單人';
-      const teacher = booking.therapist ? `指定老師：${escapeHtml(booking.therapist)}` : '老師：不指定・待店家確認';
-      row.innerHTML = `
-        <time>${escapeHtml(booking.time)}</time><span class="line-dot"></span>
-        <button class="booking-card" type="button" data-server-booking="${escapeHtml(booking.id)}">
-          <span class="booking-top"><strong>${escapeHtml(booking.customer)}</strong><span class="status ${booking.status === 'confirmed' ? 'status-ready' : booking.status === 'rejected' ? '' : 'status-alert'}">${booking.status === 'confirmed' ? '已確認' : booking.status === 'rejected' ? '已拒絕' : 'LINE 新預約'}</span></span>
-          <small>${party}・${escapeHtml(booking.service)}・${escapeHtml(booking.date)}</small><span class="therapist">${teacher}</span>
-        </button>`;
-      timeline.prepend(row);
-    });
-}
-
-function openServerBooking(bookingId) {
-  const booking = serverBookings.find((item) => item.id === bookingId);
-  if (!booking) return;
-  selectedServerBookingId = bookingId;
-  document.querySelector('#detail-title').textContent = `${booking.customer}・${booking.time}`;
-  document.querySelector('.detail-list').innerHTML = `
-    <div><dt>日期</dt><dd>${escapeHtml(booking.date)}</dd></div>
-    <div><dt>人數</dt><dd>${booking.partySize === '2' ? '雙人' : '單人'}</dd></div>
-    <div><dt>療程</dt><dd>${escapeHtml(booking.service)}</dd></div>
-    <div><dt>老師</dt><dd>${escapeHtml(booking.therapist || '不指定')}</dd></div>
-    <div><dt>手機</dt><dd>${escapeHtml(booking.phone)}</dd></div>
-    <div><dt>備註</dt><dd>${escapeHtml(booking.note || '無')}</dd></div>`;
-  document.querySelector('#detail-actions').hidden = booking.status !== 'pending';
-  openSheet(document.querySelector('#detail-sheet'));
-}
-
-function loadSettings() {
-  try { return JSON.parse(localStorage.getItem(settingsStorage)) ?? {}; } catch { return {}; }
+async function updateBookingStatus(status) {
+  const key = getAdminKey(); if (!key || !selectedBookingId) return;
+  try { const response = await fetch(`/api/admin/bookings/${encodeURIComponent(selectedBookingId)}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key }, body: JSON.stringify({ status }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '更新預約失敗'); closeSheets(); await syncData(false); showToast(`${status === 'confirmed' ? '已確認' : '已拒絕'}預約${result.lineNotification ? '，並已通知客人' : ''}`); } catch (error) { showToast(error.message); }
 }
 
 async function openSetting(key) {
-  const definition = settingDefinitions[key];
-  if (!definition) return;
-  let settings = loadSettings();
-  let adminKey = sessionStorage.getItem(adminKeyStorage);
-  if (!adminKey) {
-    adminKey = window.prompt('請輸入 Railway 設定的後台存取碼');
-    if (adminKey) sessionStorage.setItem(adminKeyStorage, adminKey);
+  const definition = settingDefinitions[key], adminKey = getAdminKey(); if (!definition || !adminKey) return; let settings = {};
+  try { const response = await fetch('/api/admin/settings', { cache: 'no-store', headers: { 'X-Admin-Key': adminKey } }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '無法讀取設定'); settings = result.settings; } catch (error) { showToast(error.message); }
+  const saved = settings[key] ?? {}, form = document.querySelector('#setting-form'); form.dataset.setting = key; document.querySelector('#setting-title').textContent = definition.title;
+  if (key === 'therapists') {
+    therapistSkillMap = { 小君: [], Amy: [], Kelly: [], ...(saved.teachers ?? {}) };
+    document.querySelector('#setting-fields').innerHTML = `<label class="field full"><span>選擇老師</span><select id="therapist-setting-select" name="therapist">${therapistNames.map((name) => `<option>${name}</option>`).join('')}</select></label><fieldset class="field full skill-options"><legend>這位老師可服務的療程</legend>${serviceNames.map((service) => `<label class="check-field"><input type="checkbox" name="skills" value="${escapeHtml(service)}" /><span>${escapeHtml(service)}</span></label>`).join('')}</fieldset>`;
+    renderTherapistSkills(therapistNames[0]);
+  } else {
+    document.querySelector('#setting-fields').innerHTML = definition.fields.map(([name, label, fallback]) => `<label class="field full"><span>${label}</span><input name="${name}" value="${escapeHtml(saved[name] ?? fallback)}" required /></label>`).join('');
   }
-  if (adminKey) {
-    try {
-      const response = await fetch('/api/admin/settings', { cache: 'no-store', headers: { 'X-Admin-Key': adminKey } });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || '無法讀取設定');
-      settings = result.settings;
-      localStorage.setItem(settingsStorage, JSON.stringify(settings));
-    } catch (error) { showToast(error.message); }
-  }
-  const saved = settings[key] ?? {};
-  const form = document.querySelector('#setting-form');
-  form.dataset.setting = key;
-  document.querySelector('#setting-title').textContent = definition.title;
-  document.querySelector('#setting-fields').innerHTML = definition.fields.map(([name, label, fallback]) => `
-    <label class="field full"><span>${label}</span><input name="${name}" value="${escapeHtml(saved[name] ?? fallback)}" required /></label>`).join('');
-  document.querySelectorAll('[data-setting]').forEach((button) => button.classList.toggle('is-active', button.dataset.setting === key));
-  openSheet(document.querySelector('#setting-sheet'));
+  document.querySelectorAll('[data-setting]').forEach((button) => button.classList.toggle('is-active', button.dataset.setting === key)); openSheet(document.querySelector('#setting-sheet'));
 }
 
-async function updateServerBookingStatus(status) {
-  const adminKey = sessionStorage.getItem(adminKeyStorage);
-  if (!adminKey || !selectedServerBookingId) return;
-  try {
-    const response = await fetch(`/api/admin/bookings/${encodeURIComponent(selectedServerBookingId)}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
-      body: JSON.stringify({ status }),
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || '更新預約失敗');
-    closeSheets();
-    await loadServerBookings(false);
-    showToast(`${status === 'confirmed' ? '已確認' : '已拒絕'}預約${result.lineNotification ? '，並已通知客人' : '，但 LINE 通知失敗'}`);
-  } catch (error) { showToast(error.message); }
+function captureTherapistSkills() {
+  const select = document.querySelector('#therapist-setting-select');
+  if (!select) return;
+  therapistSkillMap[select.value] = [...document.querySelectorAll('#setting-fields input[name="skills"]:checked')].map((input) => input.value);
 }
 
-let loadingServerBookings = false;
-async function loadServerBookings(promptForKey = true) {
-  if (loadingServerBookings) return;
-  let adminKey = sessionStorage.getItem(adminKeyStorage);
-  if (!adminKey) {
-    if (!promptForKey) return;
-    adminKey = window.prompt('請輸入 Railway 設定的後台存取碼');
-    if (!adminKey) return;
-    sessionStorage.setItem(adminKeyStorage, adminKey);
-  }
-  loadingServerBookings = true;
-  try {
-    const response = await fetch('/api/admin/bookings', {
-      cache: 'no-store',
-      headers: { 'X-Admin-Key': adminKey },
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || '無法讀取預約');
-    renderServerBookings(result.bookings);
-  } catch (error) {
-    if (/存取碼/.test(error.message)) sessionStorage.removeItem(adminKeyStorage);
-    showToast(error.message);
-  } finally {
-    loadingServerBookings = false;
-  }
+function renderTherapistSkills(name) {
+  document.querySelectorAll('#setting-fields input[name="skills"]').forEach((input) => { input.checked = (therapistSkillMap[name] ?? []).includes(input.value); });
 }
 
-function renderSavedMembers() {
-  document.querySelectorAll('.member-card.local-entry').forEach((element) => element.remove());
-  const list = document.querySelector('#member-list');
-  demoState.members.forEach((member) => {
-    const button = document.createElement('button');
-    button.className = 'member-card card local-entry';
-    button.type = 'button';
-    button.dataset.name = `${member.name} ${member.phone}`;
-    button.innerHTML = `<span class="member-avatar">${escapeHtml(member.name.slice(0, 1))}</span><span><strong>${escapeHtml(member.name)}</strong><small>${escapeHtml(member.phone || '未填手機')}</small><em>測試會員・尚未綁定 LINE</em></span><span class="chevron">›</span>`;
-    list.append(button);
-  });
-}
-
-function setDefaultBookingDate() {
-  const form = document.querySelector('#booking-form');
-  const now = new Date();
-  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-  form.elements.date.value = localDate;
-  form.elements.time.value = '10:00';
-}
-
-const today = new Intl.DateTimeFormat('zh-TW', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date());
-document.querySelector('#today-label').textContent = today;
-setDefaultBookingDate();
-renderSavedBookings();
-renderSavedMembers();
-
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && document.querySelector('[data-screen="bookings"]').classList.contains('is-active')) {
-    loadServerBookings(false);
-  }
-});
-setInterval(() => {
-  if (!document.hidden && document.querySelector('[data-screen="bookings"]').classList.contains('is-active')) {
-    loadServerBookings(false);
-  }
-}, 20_000);
+function setDefaultBookingDate() { const form = document.querySelector('#booking-form'); form.elements.date.value = localDateString(); form.elements.time.value = '10:00'; }
+document.querySelector('#today-label').textContent = new Intl.DateTimeFormat('zh-TW', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date()); buildDateStrip(); setDefaultBookingDate(); syncData(true);
 
 document.addEventListener('click', (event) => {
-  const target = event.target.closest('button');
-  if (!target) return;
-  if (target.dataset.nav) showScreen(target.dataset.nav);
-  if (target.dataset.go) showScreen(target.dataset.go);
-  if (target.hasAttribute('data-open-create')) openSheet(document.querySelector('#create-sheet'));
-  if (target.hasAttribute('data-open-booking-form')) openSheet(document.querySelector('#booking-form-sheet'));
-  if (target.hasAttribute('data-open-member-form')) openSheet(document.querySelector('#member-form-sheet'));
-  if (target.hasAttribute('data-open-detail')) {
-    selectedServerBookingId = '';
-    document.querySelector('#detail-actions').hidden = true;
-    openSheet(document.querySelector('#detail-sheet'));
-  }
-  if (target.dataset.serverBooking) openServerBooking(target.dataset.serverBooking);
-  if (target.dataset.bookingStatus) updateServerBookingStatus(target.dataset.bookingStatus);
-  if (target.dataset.setting) {
-    showScreen('more');
-    openSetting(target.dataset.setting);
-  }
-  if (target.hasAttribute('data-close-sheet')) closeSheets();
-  if (target.dataset.toast) showToast(target.dataset.toast);
-  if (target.dataset.demoBooking) {
-    const booking = demoState.bookings.find((item) => item.id === target.dataset.demoBooking);
-    if (booking) showToast(`${booking.customer}・${booking.date} ${booking.time}`);
-  }
-  if (target.hasAttribute('data-reset-demo')) {
-    localStorage.removeItem(storageKey);
-    demoState.bookings = [];
-    demoState.members = [];
-    renderSavedBookings();
-    renderSavedMembers();
-    showToast('本機測試資料已重設');
+  const target = event.target.closest('button'); if (!target) return;
+  if (target.dataset.nav) showScreen(target.dataset.nav); if (target.dataset.go) showScreen(target.dataset.go);
+  if (target.dataset.date) { selectedDate = target.dataset.date; buildDateStrip(); renderBookings(); }
+  if (target.classList.contains('chip')) { document.querySelectorAll('.chip').forEach((item) => item.classList.remove('is-selected')); target.classList.add('is-selected'); bookingFilter = target.textContent.includes('待確認') ? 'pending' : target.textContent.includes('已確認') ? 'confirmed' : 'all'; renderBookings(); }
+  if (target.hasAttribute('data-open-create')) openSheet(document.querySelector('#create-sheet')); if (target.hasAttribute('data-open-booking-form')) openSheet(document.querySelector('#booking-form-sheet')); if (target.hasAttribute('data-open-member-form')) openSheet(document.querySelector('#member-form-sheet')); if (target.hasAttribute('data-close-sheet')) closeSheets(); if (target.dataset.serverBooking) openBooking(target.dataset.serverBooking); if (target.dataset.bookingStatus) updateBookingStatus(target.dataset.bookingStatus); if (target.dataset.setting) { showScreen('more'); openSetting(target.dataset.setting); } if (target.dataset.toast) showToast(target.dataset.toast);
+});
+
+document.querySelector('#setting-fields').addEventListener('change', (event) => {
+  if (event.target.id === 'therapist-setting-select') {
+    const previous = event.target.dataset.previous || therapistNames[0];
+    const checked = [...document.querySelectorAll('#setting-fields input[name="skills"]:checked')].map((input) => input.value);
+    therapistSkillMap[previous] = checked;
+    event.target.dataset.previous = event.target.value;
+    renderTherapistSkills(event.target.value);
   }
 });
 
-backdrop.addEventListener('click', closeSheets);
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeSheets(); });
+backdrop.addEventListener('click', closeSheets); document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeSheets(); }); document.addEventListener('visibilitychange', () => { if (!document.hidden) syncData(false); }); setInterval(() => { if (!document.hidden) syncData(false); }, 30000);
+document.querySelector('#booking-date-jump').addEventListener('change', (event) => { selectedDate = event.currentTarget.value; buildDateStrip(); renderBookings(); });
+document.querySelector('#booking-form').elements.service.addEventListener('change', updateAdminTherapistOptions);
+document.querySelector('#member-search').addEventListener('input', (event) => { const query = event.currentTarget.value.trim().toLowerCase(); let visible = 0; document.querySelectorAll('.member-card').forEach((member) => { const match = member.dataset.name.toLowerCase().includes(query); member.hidden = !match; if (match) visible += 1; }); document.querySelector('#member-empty').hidden = visible !== 0; });
 
-document.querySelectorAll('.date-strip button').forEach((button) => {
-  button.addEventListener('click', () => {
-    document.querySelectorAll('.date-strip button').forEach((item) => item.classList.remove('is-selected'));
-    button.classList.add('is-selected');
-    if (!button.textContent.includes('27')) showToast('此日期目前沒有示範預約');
-  });
-});
-
-document.querySelectorAll('.chip').forEach((chip) => {
-  chip.addEventListener('click', () => {
-    document.querySelectorAll('.chip').forEach((item) => item.classList.remove('is-selected'));
-    chip.classList.add('is-selected');
-  });
-});
-
-const memberSearch = document.querySelector('#member-search');
-memberSearch.addEventListener('input', () => {
-  const query = memberSearch.value.trim().toLowerCase();
-  const members = [...document.querySelectorAll('.member-card')];
-  let visible = 0;
-  members.forEach((member) => {
-    const match = member.dataset.name.toLowerCase().includes(query);
-    member.hidden = !match;
-    if (match) visible += 1;
-  });
-  document.querySelector('#member-empty').hidden = visible !== 0;
-});
-
-document.querySelector('#booking-form').addEventListener('submit', (event) => {
-  event.preventDefault();
-  const values = Object.fromEntries(new FormData(event.currentTarget));
-  demoState.bookings.push({ id: crypto.randomUUID(), ...values });
-  saveDemoState();
-  renderSavedBookings();
-  event.currentTarget.reset();
-  setDefaultBookingDate();
-  closeSheets();
-  showScreen('bookings');
-  showToast('測試預約已建立');
-});
-
-document.querySelector('#member-form').addEventListener('submit', (event) => {
-  event.preventDefault();
-  const values = Object.fromEntries(new FormData(event.currentTarget));
-  demoState.members.push({ id: crypto.randomUUID(), ...values });
-  saveDemoState();
-  renderSavedMembers();
-  event.currentTarget.reset();
-  closeSheets();
-  showScreen('members');
-  showToast('測試會員已建立');
-});
-
-document.querySelector('#setting-form').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const key = event.currentTarget.dataset.setting;
-  const values = Object.fromEntries(new FormData(event.currentTarget));
-  const adminKey = sessionStorage.getItem(adminKeyStorage);
-  if (!adminKey) {
-    showToast('請先輸入後台存取碼');
-    return;
-  }
-  const settings = loadSettings();
-  try {
-    const response = await fetch('/api/admin/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
-      body: JSON.stringify({ key, values }),
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || '設定儲存失敗');
-    settings[key] = values;
-    localStorage.setItem(settingsStorage, JSON.stringify(settings));
-    closeSheets();
-    showToast(`${settingDefinitions[key].title}已儲存`);
-  } catch (error) { showToast(error.message); }
-});
+document.querySelector('#booking-form').addEventListener('submit', async (event) => { event.preventDefault(); const key = getAdminKey(); if (!key) return; try { const response = await fetch('/api/admin/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key }, body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '建立預約失敗'); event.currentTarget.reset(); setDefaultBookingDate(); closeSheets(); await syncData(false); showScreen('bookings'); showToast('預約已建立並同步'); } catch (error) { showToast(error.message); } });
+document.querySelector('#member-form').addEventListener('submit', async (event) => { event.preventDefault(); const key = getAdminKey(); if (!key) return; try { const response = await fetch('/api/admin/members', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key }, body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '建立會員失敗'); event.currentTarget.reset(); closeSheets(); await syncData(false); showScreen('members'); showToast('會員已建立並同步'); } catch (error) { showToast(error.message); } });
+document.querySelector('#setting-form').addEventListener('submit', async (event) => { event.preventDefault(); const key = getAdminKey(), settingKey = event.currentTarget.dataset.setting; if (!key) return; if (settingKey === 'therapists') captureTherapistSkills(); const values = settingKey === 'therapists' ? { teachers: therapistSkillMap } : Object.fromEntries(new FormData(event.currentTarget)); try { const response = await fetch('/api/admin/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key }, body: JSON.stringify({ key: settingKey, values }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || '設定儲存失敗'); closeSheets(); showToast(`${settingDefinitions[settingKey].title}已同步`); } catch (error) { showToast(error.message); } });

@@ -25,7 +25,6 @@ button { color: inherit; }
 .app-shell { width: 100%; min-height: 100dvh; background: var(--bg); }
 .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; padding: max(16px, env(safe-area-inset-top)) 20px 12px; background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(227, 224, 216, .7); }
 .eyebrow { margin: 0 0 4px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.demo-badge { display: inline-block; margin-left: 5px; padding: 3px 6px; color: var(--brand-dark); border-radius: 999px; background: var(--brand-soft); font-size: 9px; letter-spacing: .04em; vertical-align: 1px; }
 .store-name { margin: 0; font-weight: 750; font-size: 15px; }
 .avatar { width: 42px; height: 42px; border: 0; border-radius: 50%; color: white; background: var(--brand); font-weight: 800; }
 main { padding: 0 20px calc(104px + env(safe-area-inset-bottom)); }
@@ -74,6 +73,8 @@ h2 { margin-bottom: 0; font-size: 21px; letter-spacing: -.02em; }
 .date-strip span { font-size: 11px; }
 .date-strip strong { font-size: 17px; }
 .date-strip .is-selected { color: white; background: var(--brand); box-shadow: 0 7px 18px rgba(104,67,40,.2); }
+.date-jump { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; color: var(--muted); font-size: 12px; font-weight: 750; }
+.date-jump input { width: auto; min-width: 160px; height: 42px; padding: 0 12px; color: var(--ink); border: 1px solid var(--line); border-radius: 12px; background: white; }
 .filter-row { display: flex; gap: 8px; overflow: auto; margin-bottom: 24px; scrollbar-width: none; }
 .chip { padding: 9px 14px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; background: transparent; white-space: nowrap; font-size: 13px; }
 .chip.is-selected { color: var(--brand-dark); border-color: var(--brand-soft); background: var(--brand-soft); font-weight: 800; }
@@ -142,6 +143,10 @@ h2 { margin-bottom: 0; font-size: 21px; letter-spacing: -.02em; }
 .field.full { grid-column: 1 / -1; }
 .field input, .field select { width: 100%; min-width: 0; height: 48px; padding: 0 13px; color: var(--ink); border: 1px solid var(--line); border-radius: 13px; outline: none; background: #fff; }
 .field input:focus, .field select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.skill-options { margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; }
+.skill-options legend { padding: 0 6px; color: var(--muted); font-weight: 750; }
+.check-field { display: flex; align-items: center; gap: 10px; min-height: 42px; color: var(--ink); font-size: 14px; }
+.check-field input { width: 20px; height: 20px; accent-color: var(--brand); }
 .form-help { margin: 16px 2px; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .submit-button { width: 100%; min-height: 50px; color: #fff; border: 0; border-radius: 15px; background: var(--brand); font-weight: 800; }
 .booking-row.local-entry .booking-card { border-color: var(--sand); }

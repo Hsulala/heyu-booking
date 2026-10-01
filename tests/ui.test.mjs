@@ -16,10 +16,10 @@ test('mobile admin contains the four core work areas', async () => {
   }
 });
 
-test('prototype exposes booking assignment and buffer information', async () => {
-  const html = await readFile(files.html, 'utf8');
-  assert.match(html, /尚未指派老師/);
-  assert.match(html, /緩衝至 11:30/);
+test('admin exposes booking assignment and configurable buffer information', async () => {
+  const [html, js] = await Promise.all([readFile(files.html, 'utf8'), readFile(files.js, 'utf8')]);
+  assert.match(html, /稍後指派/);
+  assert.match(js, /緩衝分鐘/);
   assert.match(html, /雙人/);
 });
 
@@ -28,7 +28,7 @@ test('prototype supports phone-safe layout and reduced motion', async () => {
   assert.match(html, /viewport-fit=cover/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /prefers-reduced-motion/);
-  assert.match(js, /memberSearch\.addEventListener/);
+  assert.match(js, /#member-search/);
 });
 
 test('prototype assets also work when index.html is opened directly', async () => {
@@ -57,14 +57,14 @@ test('brand palette uses milk-tea and coffee colors', async () => {
   assert.doesNotMatch(css, /--brand: #536c60/);
 });
 
-test('owner test build can create local bookings and members without implying production persistence', async () => {
+test('admin creates cloud-synced bookings and members through protected APIs', async () => {
   const [html, js] = await Promise.all([readFile(files.html, 'utf8'), readFile(files.js, 'utf8')]);
   assert.match(html, /id="booking-form"/);
   assert.match(html, /id="member-form"/);
-  assert.match(html, /測試版資料只會保存在這台裝置的瀏覽器/);
-  assert.match(js, /localStorage\.setItem/);
-  assert.match(js, /crypto\.randomUUID/);
-  assert.match(js, /data-reset-demo/);
+  assert.match(html, /同步顯示在所有店家裝置/);
+  assert.match(js, /\/api\/admin\/bookings/);
+  assert.match(js, /\/api\/admin\/members/);
+  assert.doesNotMatch(html, /測試版|操作原型/);
 });
 
 test('customer booking entry initializes LIFF and delegates identity verification to the backend', async () => {
@@ -79,6 +79,8 @@ test('customer booking entry initializes LIFF and delegates identity verificatio
   assert.match(js, /liff\.getIDToken/);
   assert.match(js, /\/api\/auth\/line/);
   assert.match(js, /\/api\/bookings/);
+  assert.match(js, /\/api\/booking-options/);
+  assert.match(js, /skills\.includes\(serviceSelect\.value\)/);
   assert.doesNotMatch(js, /LINE_.*SECRET|CHANNEL_ACCESS_TOKEN/);
   assert.match(html, /class="form-grid schedule-grid"/);
   assert.match(css, /@media \(max-width: 430px\)/);
@@ -89,7 +91,7 @@ test('admin loads protected LINE booking requests from the backend', async () =>
   const [html, js] = await Promise.all([readFile(files.html, 'utf8'), readFile(files.js, 'utf8')]);
   assert.match(js, /\/api\/admin\/bookings/);
   assert.match(js, /X-Admin-Key/);
-  assert.match(js, /LINE 新預約/);
+  assert.match(js, /待確認/);
   assert.match(js, /\/status/);
   assert.match(html, /data-booking-status="confirmed"/);
   assert.match(html, /data-booking-status="rejected"/);
@@ -101,7 +103,29 @@ test('desktop sidebar exposes editable operating settings', async () => {
     assert.match(html, new RegExp(`data-setting="${setting}"`));
   }
   assert.match(css, /desktop-settings-nav/);
-  assert.match(js, /heyu-settings-v1/);
   assert.match(js, /setting-form/);
   assert.match(js, /\/api\/admin\/settings/);
+  assert.match(js, /therapistSkillMap/);
+  assert.match(js, /input type="checkbox" name="skills"/);
+  assert.match(js, /updateAdminTherapistOptions/);
+});
+
+test('server persists bookings, members and operating settings to the configured volume', async () => {
+  const server = await readFile(new URL('../server.mjs', import.meta.url), 'utf8');
+  assert.match(server, /process\.env\.DATA_FILE/);
+  assert.match(server, /saveBookingRequests/);
+  assert.match(server, /saveMembers/);
+  assert.match(server, /saveOperatingSettings/);
+  assert.match(server, /therapistCanServe/);
+  assert.match(server, /\/api\/booking-options/);
+});
+
+test('customer and admin content uses production-facing language', async () => {
+  const [adminHtml, bookingHtml] = await Promise.all([
+    readFile(files.html, 'utf8'),
+    readFile(new URL('../public/booking.html', import.meta.url), 'utf8'),
+  ]);
+  assert.doesNotMatch(adminHtml, /測試版|操作原型|測試操作/);
+  assert.doesNotMatch(bookingHtml, /流程測試版|測試環境/);
+  assert.match(bookingHtml, /LINE 官方預約/);
 });
