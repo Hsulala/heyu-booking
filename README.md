@@ -34,13 +34,15 @@ LINE LIFF 預約、店家後台與會員制度的單體應用專案。
 
 ## 明日測試版範圍
 
-目前部署目標是讓店家先驗證手機操作流程，不是正式營運版：
+目前部署目標是讓店家先驗證操作流程，不是正式營運版：
 
 - 可瀏覽首頁、預約、會員與設定頁。
 - 可建立單人／雙人測試預約，並選擇老師或保留待指派。
 - 可建立與搜尋測試會員。
-- 新增資料只保存在當下裝置的瀏覽器，可從「更多」重設。
-- 尚未接上 LINE 登入、正式 PostgreSQL API、付款、通知及角色權限；畫面有清楚標示「測試版」。
+- 從 LIFF 送出的預約需求會出現在後台，並嘗試以 LINE 傳送收件通知。
+- LIFF 預約目前暫存在 Railway 執行中的記憶體，服務重啟或重新部署後會清空。
+- 後台手動新增的資料只保存在當下裝置的瀏覽器，可從「更多」重設。
+- 尚未接上正式 PostgreSQL、付款、完整角色權限及時段防撞；畫面有清楚標示「測試版」。
 
 這個界線能讓老闆先確認欄位、文案與操作順序，避免測試資料被誤認為正式會員資料。
 
@@ -60,9 +62,18 @@ LINE_LOGIN_CHANNEL_ID
 LINE_LOGIN_CHANNEL_SECRET
 LINE_MESSAGING_CHANNEL_SECRET
 LINE_MESSAGING_CHANNEL_ACCESS_TOKEN
+ADMIN_ACCESS_KEY
 ```
 
-LINE Developers Console 的 LIFF Endpoint URL 使用 `/booking`，Messaging API Webhook URL 使用 `/webhooks/line`。LIFF 必須啟用 `openid`；若需要在表單預填名稱與頭像，也要啟用 `profile`。
+`ADMIN_ACCESS_KEY` 請自行設定一組不容易猜到的存取碼，店家進入預約頁時用它讀取真實測試預約。
+
+LINE Developers Console 的 LIFF Endpoint URL 使用 `/booking`。Messaging API 頁籤的 Webhook URL 請設定為：
+
+```text
+https://heyu-booking-production-bcf9.up.railway.app/webhooks/line
+```
+
+設定後按下 Verify，成功後開啟 Use webhook。LIFF 必須啟用 `openid`；若需要在表單預填名稱與頭像，也要啟用 `profile`。Webhook 是接收客人傳給官方帳號的訊息；表單送出後的確認文字則由 Push message API 傳送。
 
 ## 目前檔案
 

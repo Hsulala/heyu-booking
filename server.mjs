@@ -1,10 +1,12 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { extname, join, normalize } from 'node:path';
-import { replyLineMessage, verifyLineIdToken, verifyWebhookSignature } from './lib/line.mjs';
+import { pushLineMessage, replyLineMessage, verifyLineIdToken, verifyWebhookSignature } from './lib/line.mjs';
 
 const port = Number(process.env.PORT || 3000);
 const publicDir = join(import.meta.dirname, 'public');
+const bookingRequests = [];
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -41,6 +43,79 @@ async function handleLineAuth(request, response) {
   } catch (error) {
     json(response, 401, { authenticated: false, error: error.message });
   }
+}
+
+function cleanText(value, maxLength) {
+  return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+}
+
+async function handleCreateBooking(request, response) {
+  try {
+    const rawBody = await readBody(request);
+    const values = JSON.parse(rawBody.toString('utf8'));
+    const profile = await verifyLineIdToken(values.idToken, process.env.LINE_LOGIN_CHANNEL_ID);
+    const booking = {
+      id: randomUUID(),
+      createdAt: new Date().toISOString(),
+      date: cleanText(values.date, 10),
+      time: cleanText(values.time, 5),
+      branch: cleanText(values.branch, 40),
+      service: cleanText(values.service, 80),
+      partySize: values.partySize === '2' ? '2' : '1',
+      therapist: cleanText(values.therapist, 40),
+      customer: cleanText(values.name, 30),
+      phone: cleanText(values.phone, 20),
+      note: cleanText(values.note, 300),
+      lineUserId: profile.userId,
+      status: 'pending',
+    };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(booking.date) || !/^\d{2}:\d{2}$/.test(booking.time)) {
+      throw new Error('請選擇有效的日期與時間');
+    }
+    if (!booking.customer || !booking.phone || !booking.service) throw new Error('預約資料不完整');
+    bookingRequests.push(booking);
+
+    const party = booking.partySize === '2' ? '雙人' : '單人';
+    const confirmation = [
+      '禾域已收到您的預約需求 🌿',
+      `${booking.date} ${booking.time}`,
+      `${party}・${booking.service}`,
+      booking.therapist ? `指定老師：${booking.therapist}` : '老師：不指定',
+      '',
+      '目前尚未正式成立，請等候店家確認。',
+    ].join('\n');
+    let lineNotification = true;
+    try {
+      await pushLineMessage(
+        profile.userId,
+        [{ type: 'text', text: confirmation }],
+        process.env.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN,
+      );
+    } catch (error) {
+      lineNotification = false;
+      console.error('LINE booking confirmation error:', error.message);
+    }
+
+    json(response, 201, {
+      booking: { id: booking.id, date: booking.date, time: booking.time, status: booking.status },
+      lineNotification,
+    });
+  } catch (error) {
+    json(response, 400, { error: error.message });
+  }
+}
+
+function handleListBookings(request, response) {
+  const configuredKey = process.env.ADMIN_ACCESS_KEY;
+  if (!configuredKey) {
+    json(response, 503, { error: '後台尚未設定 ADMIN_ACCESS_KEY' });
+    return;
+  }
+  if (request.headers['x-admin-key'] !== configuredKey) {
+    json(response, 401, { error: '後台存取碼不正確' });
+    return;
+  }
+  json(response, 200, { bookings: bookingRequests.slice().reverse() });
 }
 
 async function handleLineWebhook(request, response) {
@@ -136,6 +211,14 @@ const server = createServer(async (request, response) => {
   }
   if (request.method === 'POST' && pathname === '/api/auth/line') {
     await handleLineAuth(request, response);
+    return;
+  }
+  if (request.method === 'POST' && pathname === '/api/bookings') {
+    await handleCreateBooking(request, response);
+    return;
+  }
+  if (request.method === 'GET' && pathname === '/api/admin/bookings') {
+    handleListBookings(request, response);
     return;
   }
   if (request.method === 'POST' && pathname === '/webhooks/line') {

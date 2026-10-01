@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import test from 'node:test';
-import { replyLineMessage, verifyLineIdToken, verifyWebhookSignature } from '../lib/line.mjs';
+import { pushLineMessage, replyLineMessage, verifyLineIdToken, verifyWebhookSignature } from '../lib/line.mjs';
 
 test('LINE webhook signatures are verified with the raw request body', () => {
   const body = Buffer.from('{"events":[]}');
@@ -39,4 +39,23 @@ test('LINE replies never expose the channel token in the request body', async ()
     return new Response('', { status: 200 });
   };
   assert.equal(await replyLineMessage('reply-token', [{ type: 'text', text: '預約' }], 'private-token', fakeFetch), true);
+});
+
+test('LINE booking confirmations use the push endpoint without exposing the token', async () => {
+  const fakeFetch = async (url, options) => {
+    assert.equal(url, 'https://api.line.me/v2/bot/message/push');
+    assert.equal(options.headers.Authorization, 'Bearer private-token');
+    assert.doesNotMatch(options.body, /private-token/);
+    assert.deepEqual(JSON.parse(options.body), {
+      to: 'U-test-user',
+      messages: [{ type: 'text', text: '已收到預約需求' }],
+    });
+    return new Response('', { status: 200 });
+  };
+  assert.equal(await pushLineMessage(
+    'U-test-user',
+    [{ type: 'text', text: '已收到預約需求' }],
+    'private-token',
+    fakeFetch,
+  ), true);
 });

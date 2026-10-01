@@ -144,6 +144,7 @@ h2 { margin-bottom: 0; font-size: 21px; letter-spacing: -.02em; }
 .form-help { margin: 16px 2px; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .submit-button { width: 100%; min-height: 50px; color: #fff; border: 0; border-radius: 15px; background: var(--brand); font-weight: 800; }
 .booking-row.local-entry .booking-card { border-color: var(--sand); }
+.booking-row.remote-entry .booking-card { border-color: var(--brand); box-shadow: 0 7px 22px rgba(104,67,40,.12); }
 .member-card.local-entry { border-color: var(--sand); }
 .toast { position: fixed; z-index: 60; right: 20px; bottom: 100px; left: 20px; padding: 13px 16px; color: white; border-radius: 14px; background: var(--brand-dark); text-align: center; opacity: 0; transform: translateY(10px); pointer-events: none; transition: .2s ease; }
 .toast.is-visible { opacity: 1; transform: none; }

@@ -4,6 +4,7 @@ const backdrop = document.querySelector('.backdrop');
 const sheets = [...document.querySelectorAll('.bottom-sheet')];
 const toast = document.querySelector('.toast');
 const storageKey = 'heyu-booking-demo-v1';
+const adminKeyStorage = 'heyu-admin-key';
 
 function loadDemoState() {
   try {
@@ -29,6 +30,7 @@ function showScreen(name) {
   screens.forEach((screen) => screen.classList.toggle('is-active', screen.dataset.screen === name));
   navButtons.forEach((button) => button.classList.toggle('is-active', button.dataset.nav === name));
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (name === 'bookings') loadServerBookings();
 }
 
 function openSheet(sheet) {
@@ -74,6 +76,54 @@ function renderSavedBookings() {
     });
 }
 
+function renderServerBookings(bookings) {
+  document.querySelectorAll('.booking-row.remote-entry').forEach((element) => element.remove());
+  const timeline = document.querySelector('#booking-timeline');
+  bookings
+    .slice()
+    .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
+    .forEach((booking) => {
+      const row = document.createElement('article');
+      row.className = 'booking-row remote-entry attention';
+      const party = booking.partySize === '2' ? '雙人' : '單人';
+      const teacher = booking.therapist ? `指定老師：${escapeHtml(booking.therapist)}` : '老師：不指定・待店家確認';
+      row.innerHTML = `
+        <time>${escapeHtml(booking.time)}</time><span class="line-dot"></span>
+        <button class="booking-card" type="button" data-toast="${escapeHtml(booking.phone)}${booking.note ? `・${escapeHtml(booking.note)}` : ''}">
+          <span class="booking-top"><strong>${escapeHtml(booking.customer)}</strong><span class="status status-alert">LINE 新預約</span></span>
+          <small>${party}・${escapeHtml(booking.service)}・${escapeHtml(booking.date)}</small><span class="therapist">${teacher}</span>
+        </button>`;
+      timeline.prepend(row);
+    });
+}
+
+let loadingServerBookings = false;
+async function loadServerBookings(promptForKey = true) {
+  if (loadingServerBookings) return;
+  let adminKey = sessionStorage.getItem(adminKeyStorage);
+  if (!adminKey) {
+    if (!promptForKey) return;
+    adminKey = window.prompt('請輸入 Railway 設定的後台存取碼');
+    if (!adminKey) return;
+    sessionStorage.setItem(adminKeyStorage, adminKey);
+  }
+  loadingServerBookings = true;
+  try {
+    const response = await fetch('/api/admin/bookings', {
+      cache: 'no-store',
+      headers: { 'X-Admin-Key': adminKey },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '無法讀取預約');
+    renderServerBookings(result.bookings);
+  } catch (error) {
+    if (/存取碼/.test(error.message)) sessionStorage.removeItem(adminKeyStorage);
+    showToast(error.message);
+  } finally {
+    loadingServerBookings = false;
+  }
+}
+
 function renderSavedMembers() {
   document.querySelectorAll('.member-card.local-entry').forEach((element) => element.remove());
   const list = document.querySelector('#member-list');
@@ -100,6 +150,17 @@ document.querySelector('#today-label').textContent = today;
 setDefaultBookingDate();
 renderSavedBookings();
 renderSavedMembers();
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && document.querySelector('[data-screen="bookings"]').classList.contains('is-active')) {
+    loadServerBookings(false);
+  }
+});
+setInterval(() => {
+  if (!document.hidden && document.querySelector('[data-screen="bookings"]').classList.contains('is-active')) {
+    loadServerBookings(false);
+  }
+}, 20_000);
 
 document.addEventListener('click', (event) => {
   const target = event.target.closest('button');

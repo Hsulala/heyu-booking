@@ -74,12 +74,20 @@ test('customer booking entry initializes LIFF and delegates identity verificatio
     readFile(new URL('../public/booking.js', import.meta.url), 'utf8'),
   ]);
   assert.match(html, /static\.line-scdn\.net\/liff\/edge\/2\/sdk\.js/);
-  assert.match(html, /表單內容不會傳送或保存/);
+  assert.match(html, /送出後店家會收到預約需求/);
   assert.match(js, /liff\.init/);
   assert.match(js, /liff\.getIDToken/);
   assert.match(js, /\/api\/auth\/line/);
+  assert.match(js, /\/api\/bookings/);
   assert.doesNotMatch(js, /LINE_.*SECRET|CHANNEL_ACCESS_TOKEN/);
   assert.match(html, /class="form-grid schedule-grid"/);
   assert.match(css, /@media \(max-width: 430px\)/);
   assert.match(css, /\.schedule-grid \{ grid-template-columns: 1fr; \}/);
+});
+
+test('admin loads protected LINE booking requests from the backend', async () => {
+  const js = await readFile(files.js, 'utf8');
+  assert.match(js, /\/api\/admin\/bookings/);
+  assert.match(js, /X-Admin-Key/);
+  assert.match(js, /LINE 新預約/);
 });

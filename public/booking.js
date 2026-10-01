@@ -4,6 +4,8 @@ const profileAvatar = document.querySelector('#profile-avatar');
 const form = document.querySelector('#customer-booking-form');
 const successCard = document.querySelector('#success-card');
 const successSummary = document.querySelector('#success-summary');
+const submitButton = form.querySelector('.submit-button');
+let lineIdToken = '';
 
 function setDefaultDate() {
   const now = new Date();
@@ -31,13 +33,13 @@ async function initializeLine() {
       return;
     }
 
-    const idToken = window.liff.getIDToken();
-    if (!idToken) throw new Error('LIFF 必須啟用 openid 權限');
+    lineIdToken = window.liff.getIDToken();
+    if (!lineIdToken) throw new Error('LIFF 必須啟用 openid 權限');
 
     const authResponse = await fetch('/api/auth/line', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({ idToken: lineIdToken }),
     });
     const auth = await authResponse.json();
     if (!authResponse.ok || !auth.authenticated) throw new Error(auth.error || 'LINE 登入驗證失敗');
@@ -64,14 +66,33 @@ async function initializeLine() {
 setDefaultDate();
 window.addEventListener('load', initializeLine);
 
-form.addEventListener('submit', (event) => {
+form.addEventListener('submit', async (event) => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(form));
-  const party = values.partySize === '2' ? '雙人' : '單人';
-  successSummary.textContent = `${values.date} ${values.time}・${party}・${values.service}`;
-  form.hidden = true;
-  successCard.hidden = false;
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  submitButton.disabled = true;
+  submitButton.textContent = '正在送出…';
+  try {
+    const response = await fetch('/api/bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...values, idToken: lineIdToken }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '預約送出失敗');
+    const party = values.partySize === '2' ? '雙人' : '單人';
+    const notification = result.lineNotification
+      ? 'LINE 對話中也已傳送收件通知。'
+      : '預約已收到，但 LINE 通知暫時傳送失敗，店家仍可在後台查看。';
+    successSummary.textContent = `${values.date} ${values.time}・${party}・${values.service}。${notification}`;
+    form.hidden = true;
+    successCard.hidden = false;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (error) {
+    window.alert(error.message);
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = '送出預約需求';
+  }
 });
 
 document.querySelector('#new-booking').addEventListener('click', () => {
