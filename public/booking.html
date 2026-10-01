@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f8efe4" />
+    <title>禾域｜LINE 預約</title>
+    <link rel="stylesheet" href="./booking.css" />
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js" defer></script>
+    <script src="./booking.js" defer></script>
+  </head>
+  <body>
+    <main class="booking-shell">
+      <header>
+        <p class="eyebrow">HEYU · 禾域</p>
+        <span class="test-badge">流程測試版</span>
+      </header>
+
+      <section class="hero">
+        <p>給自己一段好好休息的時間</p>
+        <h1>預約按摩</h1>
+        <span>登入 LINE 後即可填寫預約需求。</span>
+      </section>
+
+      <section class="login-card" id="login-card" aria-live="polite">
+        <div class="profile-placeholder" id="profile-avatar">和</div>
+        <div>
+          <strong id="login-title">正在連接 LINE…</strong>
+          <p id="login-message">請稍候，不需要另外輸入密碼。</p>
+        </div>
+      </section>
+
+      <form id="customer-booking-form" hidden>
+        <section class="card">
+          <div class="section-title"><span>1</span><h2>預約時間</h2></div>
+          <div class="form-grid">
+            <label><span>日期</span><input name="date" type="date" required /></label>
+            <label><span>時間</span><input name="time" type="time" required /></label>
+            <label class="full"><span>分店</span><select name="branch"><option>禾域本店</option></select></label>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-title"><span>2</span><h2>療程內容</h2></div>
+          <div class="form-grid">
+            <label class="full"><span>療程</span><select name="service"><option>身體精油按摩 60 分</option><option>深層舒壓 90 分</option><option>筋膜刀 60 分</option></select></label>
+            <label><span>人數</span><select name="partySize"><option value="1">單人</option><option value="2">雙人</option></select></label>
+            <label><span>指定老師</span><select name="therapist"><option value="">不指定</option><option>小君</option><option>Amy</option><option>Kelly</option></select></label>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-title"><span>3</span><h2>聯絡資料</h2></div>
+          <div class="form-grid">
+            <label class="full"><span>姓名</span><input name="name" maxlength="30" required /></label>
+            <label class="full"><span>手機</span><input name="phone" inputmode="tel" maxlength="20" required placeholder="09xx xxx xxx" /></label>
+            <label class="full"><span>備註</span><textarea name="note" rows="3" maxlength="300" placeholder="例如：懷孕、近期受傷或需要避開的部位"></textarea></label>
+          </div>
+        </section>
+
+        <p class="privacy-note">送出前請確認資料正確。目前為流程測試，表單內容不會傳送或保存，也不會進入正式預約排程。</p>
+        <button class="submit-button" type="submit">完成流程測試</button>
+      </form>
+
+      <section class="success-card" id="success-card" hidden>
+        <div class="success-mark">✓</div>
+        <h2>預約流程測試完成</h2>
+        <p id="success-summary"></p>
+        <p>正式版接上資料庫後，店家確認與提醒會由 LINE 傳送。</p>
+        <button type="button" id="new-booking">再填一筆</button>
+      </section>
+    </main>
+  </body>
+</html>

@@ -44,6 +44,26 @@ LINE LIFF 預約、店家後台與會員制度的單體應用專案。
 
 這個界線能讓老闆先確認欄位、文案與操作順序，避免測試資料被誤認為正式會員資料。
 
+## LINE 整合
+
+- 客人入口：`/booking`
+- LINE 身分驗證：`POST /api/auth/line`
+- Messaging API Webhook：`POST /webhooks/line`
+- 公開 LIFF 設定：`GET /api/config`（只回傳非機密 ID）
+- 整合狀態：`GET /api/integration-status`（只回傳布林值）
+
+Railway 必須設定以下變數，Secret 與 Access Token 不得提交到 Git：
+
+```text
+LINE_LIFF_ID
+LINE_LOGIN_CHANNEL_ID
+LINE_LOGIN_CHANNEL_SECRET
+LINE_MESSAGING_CHANNEL_SECRET
+LINE_MESSAGING_CHANNEL_ACCESS_TOKEN
+```
+
+LINE Developers Console 的 LIFF Endpoint URL 使用 `/booking`，Messaging API Webhook URL 使用 `/webhooks/line`。LIFF 必須啟用 `openid`；若需要在表單預填名稱與頭像，也要啟用 `profile`。
+
 ## 目前檔案
 
 - `massage_booking_schema_v0.2.sql`：原始審查稿，保留作為歷史資料。

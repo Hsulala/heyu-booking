@@ -64,3 +64,16 @@ test('owner test build can create local bookings and members without implying pr
   assert.match(js, /crypto\.randomUUID/);
   assert.match(js, /data-reset-demo/);
 });
+
+test('customer booking entry initializes LIFF and delegates identity verification to the backend', async () => {
+  const [html, js] = await Promise.all([
+    readFile(new URL('../public/booking.html', import.meta.url), 'utf8'),
+    readFile(new URL('../public/booking.js', import.meta.url), 'utf8'),
+  ]);
+  assert.match(html, /static\.line-scdn\.net\/liff\/edge\/2\/sdk\.js/);
+  assert.match(html, /表單內容不會傳送或保存/);
+  assert.match(js, /liff\.init/);
+  assert.match(js, /liff\.getIDToken/);
+  assert.match(js, /\/api\/auth\/line/);
+  assert.doesNotMatch(js, /LINE_.*SECRET|CHANNEL_ACCESS_TOKEN/);
+});
